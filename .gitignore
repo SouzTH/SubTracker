@@ -1,0 +1,19 @@
+# Node / Dependências (Muito pesado, nunca deve subir)
+node_modules/
+.pnpm-store/
+
+# Builds / Compilação
+dist/
+build/
+*.tsbuildinfo
+
+# Variáveis de Ambiente e Chaves de API
+.env
+.env.local
+.env.*.local
+
+# Arquivos do Sistema Operacional e Editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
