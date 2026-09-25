@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react"
 import { Subscription, Screen } from "../App"
 
 interface Props {
@@ -42,6 +43,8 @@ const CATEGORY_LIMITS: Record<string, number> = {
 }
 
 export default function Dashboard({ subs, navigate }: Props) {
+  
+
   const active = subs.filter((s) => s.status === "Ativa")
   const total = active.reduce((acc, s) => acc + s.value, 0)
   const sorted = [...subs].sort(
@@ -466,32 +469,6 @@ export default function Dashboard({ subs, navigate }: Props) {
         </div>
       </div>
 
-      {/* FAB */}
-      <button
-        onClick={() => navigate("add")}
-        style={{
-          position: "fixed",
-          bottom: "96px",
-          right: "calc(50% - 195px + 20px)",
-          width: "56px",
-          height: "56px",
-          borderRadius: "18px",
-          background: "var(--primary)",
-          border: "none",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "28px",
-          color: "var(--primary-foreground)",
-          fontWeight: "300",
-          boxShadow: "0 8px 32px rgba(0,212,170,0.4)",
-          zIndex: 40,
-          transition: "transform 0.15s, box-shadow 0.15s",
-        }}
-      >
-        +
-      </button>
     </div>
   )
 }
