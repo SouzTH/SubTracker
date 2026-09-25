@@ -4,6 +4,9 @@ import AddSubscription from "./screens/AddSubscription";
 import SubscriptionDetails from "./screens/SubscriptionDetails";
 import Report from "./screens/Report";
 import ImportStatement from "./screens/ImportStatement";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Login } from './pages/Login/Login';
+import { Register } from './pages/Login/Cadastro';
 
 export type Screen = "dashboard" | "add" | "details" | "report" | "import";
 
@@ -132,39 +135,48 @@ export default function App() {
   const selectedSub = subs.find((s) => s.id === selectedId) ?? null;
 
   return (
-    <div className="min-h-full flex items-center justify-center" style={{ background: "var(--background)", padding: "24px 16px" }}>
-      <div
-        style={{
-          width: "390px",
-          minHeight: "844px",
-          background: "var(--background)",
-          borderRadius: "44px",
-          overflow: "hidden",
-          position: "relative",
-          boxShadow: "0 40px 120px rgba(0,212,170,0.1), 0 0 0 1px rgba(255,255,255,0.06)",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {screen === "dashboard" && (
-          <Dashboard subs={subs} navigate={navigate} />
-        )}
-        {screen === "add" && (
-          <AddSubscription subs={subs} setSubs={setSubs} navigate={navigate} />
-        )}
-        {screen === "details" && selectedSub && (
-          <SubscriptionDetails sub={selectedSub} navigate={navigate} />
-        )}
-        {screen === "report" && (
-          <Report subs={subs} navigate={navigate} />
-        )}
-        {screen === "import" && (
-          <ImportStatement subs={subs} setSubs={setSubs} navigate={navigate} />
-        )}
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/cadastro" element={<Register />} />
+        
+        <Route path="/painel" element={
+          <div className="min-h-full flex items-center justify-center" style={{ background: "var(--background)", padding: "24px 16px", minHeight: "100vh" }}>
+            <div
+              style={{
+                width: "390px",
+                minHeight: "844px",
+                background: "var(--background)",
+                borderRadius: "44px",
+                overflow: "hidden",
+                position: "relative",
+                boxShadow: "0 40px 120px rgba(0,212,170,0.1), 0 0 0 1px rgba(255,255,255,0.06)",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {screen === "dashboard" && (
+                <Dashboard subs={subs} navigate={navigate} />
+              )}
+              {screen === "add" && (
+                <AddSubscription subs={subs} setSubs={setSubs} navigate={navigate} />
+              )}
+              {screen === "details" && selectedSub && (
+                <SubscriptionDetails sub={selectedSub} navigate={navigate} />
+              )}
+              {screen === "report" && (
+                <Report subs={subs} navigate={navigate} />
+              )}
+              {screen === "import" && (
+                <ImportStatement subs={subs} setSubs={setSubs} navigate={navigate} />
+              )}
 
-        <BottomNav screen={screen} navigate={navigate} />
-      </div>
-    </div>
+              <BottomNav screen={screen} navigate={navigate} />
+            </div>
+          </div>
+        } />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

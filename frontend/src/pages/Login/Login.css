@@ -1,0 +1,103 @@
+.auth-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100vw;
+    background: var(--background, #080e1d);
+    padding: 24px 16px;
+    font-family: 'Inter', sans-serif;
+}
+
+.auth-container {
+    width: 100%;
+    max-width: 390px;
+    background: var(--background, #080e1d);
+    border-radius: 44px;
+    box-shadow: 0 40px 120px rgba(0,212,170,0.1), 0 0 0 1px rgba(255,255,255,0.06);
+    padding: 50px 30px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.auth-container h1 {
+    font-size: 28px;
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.input-box {
+    position: relative;
+    width: 100%;
+    height: 52px;
+    margin-bottom: 20px;
+}
+
+.input-box input {
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    outline: none;
+    border-radius: 16px;
+    font-size: 15px;
+    color: #fff;
+    padding: 0 45px 0 20px;
+    transition: 0.3s;
+}
+
+.input-box input:focus {
+    border-color: var(--primary, #00d4aa);
+}
+
+.input-box input::placeholder {
+    color: var(--muted-foreground, #a1a1aa);
+}
+
+.input-box i {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 20px;
+    color: var(--muted-foreground, #a1a1aa);
+}
+
+.btn-auth {
+    width: 100%;
+    height: 52px;
+    background: var(--primary, #00d4aa);
+    border: none;
+    outline: none;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 16px;
+    color: #080e1d;
+    font-weight: 600;
+    margin-top: 20px;
+    transition: 0.2s;
+}
+
+.btn-auth:hover {
+    opacity: 0.8;
+}
+
+.auth-link {
+    font-size: 14px;
+    text-align: center;
+    margin-top: 24px;
+    color: var(--muted-foreground, #a1a1aa);
+}
+
+.auth-link a {
+    color: var(--primary, #00d4aa);
+    text-decoration: none;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.auth-link a:hover {
+    text-decoration: underline;
+}
