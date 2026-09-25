@@ -24,7 +24,7 @@ export interface Subscription {
   history: { date: string; value: number; status: "Pago" | "Pendente" }[];
 }
 
-const INITIAL_SUBS: Subscription[] = [
+/*const INITIAL_SUBS: Subscription[] = [
   {
     id: 1,
     name: "Netflix",
@@ -51,15 +51,23 @@ const INITIAL_SUBS: Subscription[] = [
     icon: "🎵",
     history: [{ date: "2026-09-08", value: 21.90, status: "Pago" }],
   }
-];
+];*/
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [subs, setSubs] = useState<Subscription[]>(INITIAL_SUBS);
+  
   
   // Deteta se o ecrã atual é telemóvel (menos de 768px de largura)
+  const [subs, setSubs] = useState<Subscription[]>([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    fetch("http://localhost:3000/subs")
+      .then(response => response.json())
+      .then(data => setSubs(data))
+      .catch(error => console.error("Erro ao carregar dados:", error));
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {

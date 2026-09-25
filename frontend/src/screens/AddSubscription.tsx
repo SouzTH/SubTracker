@@ -38,8 +38,10 @@ export default function AddSubscription({ subs, setSubs, navigate }: Props) {
     setStep("details");
   };
 
-  const handleSave = () => {
+  // FUNÇÃO ATUALIZADA PARA ENVIAR PARA O JSON SERVER
+  const handleSave = async () => {
     if (!selected || !value) return;
+    
     const newSub: Subscription = {
       id: Date.now(),
       name: selected.name,
@@ -53,8 +55,28 @@ export default function AddSubscription({ subs, setSubs, navigate }: Props) {
       icon: selected.icon,
       history: [],
     };
-    setSubs([...subs, newSub]);
-    navigate("dashboard");
+
+    try {
+      // Faz o pedido POST para gravar os dados
+      const response = await fetch("http://localhost:3000/subs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newSub),
+      });
+
+      if (response.ok) {
+        // Se correu bem, atualiza o ecrã e volta ao dashboard
+        const savedSub = await response.json();
+        setSubs([...subs, savedSub]);
+        navigate("dashboard");
+      } else {
+        console.error("Erro ao guardar no servidor");
+      }
+    } catch (error) {
+      console.error("Erro de ligação ao servidor:", error);
+    }
   };
 
   return (
