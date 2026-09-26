@@ -5,8 +5,8 @@ import SubscriptionDetails from "./screens/SubscriptionDetails";
 import Report from "./screens/Report";
 import ImportStatement from "./screens/ImportStatement";
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Login } from './pages/Login/Login';
-import { Register } from './pages/Login/Cadastro';
+import { Login } from './screens/Login';
+import { Register } from './screens/Register';
 
 export type Screen = "dashboard" | "add" | "details" | "report" | "import";
 
