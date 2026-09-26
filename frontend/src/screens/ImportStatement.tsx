@@ -18,37 +18,14 @@ interface DetectedSub {
   confirmed: boolean;
 }
 
-const DETECTED: DetectedSub[] = [
-  {
-    id: 101,
-    name: "Spotify",
-    icon: "🎵",
-    color: "#1db954",
-    value: 21.90,
-    detectedDate: "10/08/2026",
-    category: "Música",
-    confirmed: false,
-  },
-  {
-    id: 102,
-    name: "iCloud+",
-    icon: "☁️",
-    color: "#0ea5e9",
-    value: 9.90,
-    detectedDate: "12/08/2026",
-    category: "Outros",
-    confirmed: false,
-  },
-  {
-    id: 103,
-    name: "Canva Pro",
-    icon: "🖌️",
-    color: "#8b5cf6",
-    value: 54.90,
-    detectedDate: "18/08/2026",
-    category: "Trabalho",
-    confirmed: false,
-  },
+// Catálogo de regras para detetar serviços conhecidos no extrato
+const KNOWN_SERVICES = [
+  { keyword: "NETFLIX", name: "Netflix", icon: "🎬", color: "#e50914", category: "Streaming" as const },
+  { keyword: "SPOTIFY", name: "Spotify", icon: "🎵", color: "#1db954", category: "Música" as const },
+  { keyword: "SMARTFIT", name: "Academia", icon: "💪", color: "#f59e0b", category: "Fitness" as const },
+  { keyword: "ADOBE", name: "Adobe Creative", icon: "🎨", color: "#ff0000", category: "Trabalho" as const },
+  { keyword: "GITHUB", name: "GitHub Pro", icon: "💻", color: "#6e5494", category: "Trabalho" as const },
+  { keyword: "CANVA", name: "Canva Pro", icon: "🖌️", color: "#8b5cf6", category: "Trabalho" as const },
 ];
 
 function fmt(v: number) {
@@ -59,14 +36,63 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
   const [stage, setStage] = useState<"upload" | "review">("upload");
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [detected, setDetected] = useState<DetectedSub[]>(DETECTED);
+  const [detected, setDetected] = useState<DetectedSub[]>([]);
   const [confirmed, setConfirmed] = useState<Set<number>>(new Set());
   const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (name: string) => {
-    setFileName(name);
-    setTimeout(() => setStage("review"), 800);
+  // MOTOR REAL DE LEITURA DO CSV
+  const processCSVText = (text: string) => {
+    const lines = text.split("\n");
+    const found: DetectedSub[] = [];
+    let idCounter = 1;
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      // O formato esperado do CSV é: data,descricao,valor
+      const parts = line.split(",");
+      if (parts.length >= 3) {
+        const dateStr = parts[0].trim(); // ex: 05/09/2026
+        const desc = parts[1].trim().toUpperCase(); // ex: NETFLIX.COM
+        const rawValue = parseFloat(parts[2].trim()); // ex: -55.90
+
+        // Procura se a descrição corresponde a algum serviço conhecido
+        const match = KNOWN_SERVICES.find((s) => desc.includes(s.keyword));
+
+        if (match) {
+          const absoluteValue = Math.abs(rawValue); // Converte para positivo
+          found.push({
+            id: idCounter++,
+            name: match.name,
+            icon: match.icon,
+            color: match.color,
+            value: absoluteValue,
+            detectedDate: dateStr,
+            category: match.category,
+            confirmed: true, // Pré-selecionado por defeito
+          });
+        }
+      }
+    }
+
+    setDetected(found);
+    // Seleciona todos automaticamente por defeito
+    setConfirmed(new Set(found.map((f) => f.id)));
+  };
+
+  const handleFile = (file: File) => {
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (text) {
+        processCSVText(text);
+        setStage("review");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const toggle = (id: number) => {
@@ -77,30 +103,50 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    const userStorage = localStorage.getItem('subtracker_user');
+    if (!userStorage) {
+        alert("Sessão expirada. Faça login novamente.");
+        window.location.href = "/";
+        return;
+    }
+    const currentUser = JSON.parse(userStorage);
+
     const toAdd = detected
       .filter((d) => confirmed.has(d.id))
       .map((d) => ({
-        id: d.id,
+        id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
+        userId: currentUser.id,
         name: d.name,
         icon: d.icon,
         color: d.color,
         category: d.category,
         value: d.value,
         period: "Mensal" as const,
-        nextCharge: "2026-09-10",
+        nextCharge: "2026-10-10",
         paymentMethod: "Cartão de crédito",
         status: "Ativa" as const,
-        history: [{ date: "2026-08-" + d.detectedDate.split("/")[0], value: d.value, status: "Pago" as const }],
+        history: [{ date: "2026-09-" + d.detectedDate.split("/")[0], value: d.value, status: "Pago" as const }],
       }));
-    setSubs([...subs, ...toAdd]);
-    setSaved(true);
-    setTimeout(() => navigate("dashboard"), 1400);
+
+    try {
+      for (const newSub of toAdd) {
+        await fetch("http://localhost:3000/subs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newSub),
+        });
+      }
+      setSubs([...subs, ...toAdd]);
+      setSaved(true);
+      setTimeout(() => navigate("dashboard"), 1400);
+    } catch (error) {
+      console.error("Erro ao salvar assinaturas importadas:", error);
+    }
   };
 
   return (
     <div style={{ flex: 1, overflowY: "auto" }}>
-      {/* Header */}
       <div style={{ padding: "56px 24px 20px", display: "flex", alignItems: "center", gap: "14px" }}>
         <button
           onClick={() => (stage === "review" ? setStage("upload") : navigate("dashboard"))}
@@ -118,12 +164,11 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
             Importar Extrato
           </h1>
           <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0 }}>
-            {stage === "upload" ? "Envie seu arquivo OFX ou CSV" : "Assinaturas detectadas"}
+            {stage === "upload" ? "Envie seu arquivo CSV" : "Assinaturas detectadas"}
           </p>
         </div>
       </div>
 
-      {/* Progress */}
       <div style={{ padding: "0 24px 24px" }}>
         <div style={{ height: "3px", background: "var(--border)", borderRadius: "4px" }}>
           <div style={{
@@ -137,77 +182,61 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
 
       <div style={{ padding: "0 24px" }}>
         {stage === "upload" && (
-          <>
-            {/* Drop zone */}
-            <div
-              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragging(false);
-                const f = e.dataTransfer.files[0];
-                if (f) handleFile(f.name);
-              }}
-              onClick={() => fileRef.current?.click()}
-              style={{
-                border: `2px dashed ${dragging ? "var(--primary)" : "rgba(0,212,170,0.25)"}`,
-                borderRadius: "20px",
-                padding: "48px 24px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "12px",
-                cursor: "pointer",
-                background: dragging ? "rgba(0,212,170,0.05)" : "var(--card)",
-                transition: "all 0.2s",
-                marginBottom: "20px",
-              }}
-            >
-              <div style={{
-                width: "64px", height: "64px", borderRadius: "20px",
-                background: "rgba(0,212,170,0.1)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "32px",
-              }}>
-                📄
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "16px", margin: "0 0 6px" }}>
-                  Arraste seu arquivo aqui
-                </p>
-                <p style={{ fontSize: "13px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0 }}>
-                  ou clique para selecionar
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                {["OFX", "CSV"].map((ext) => (
-                  <span key={ext} style={{
-                    fontSize: "11px", padding: "4px 10px", borderRadius: "8px",
-                    background: "var(--secondary)", color: "var(--muted-foreground)",
-                    fontFamily: "Inter, sans-serif", fontWeight: 500,
-                  }}>
-                    .{ext}
-                  </span>
-                ))}
-              </div>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".ofx,.csv"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFile(f.name);
-                }}
-              />
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              const f = e.dataTransfer.files[0];
+              if (f) handleFile(f);
+            }}
+            onClick={() => fileRef.current?.click()}
+            style={{
+              border: `2px dashed ${dragging ? "var(--primary)" : "rgba(0,212,170,0.25)"}`,
+              borderRadius: "20px",
+              padding: "48px 24px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "12px",
+              cursor: "pointer",
+              background: dragging ? "rgba(0,212,170,0.05)" : "var(--card)",
+              transition: "all 0.2s",
+              marginBottom: "20px",
+            }}
+          >
+            <div style={{
+              width: "64px", height: "64px", borderRadius: "20px",
+              background: "rgba(0,212,170,0.1)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "32px",
+            }}>
+              📄
             </div>
-
-          </>
+            <div style={{ textAlign: "center" }}>
+              <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "16px", margin: "0 0 6px" }}>
+                Arraste seu arquivo aqui
+              </p>
+              <p style={{ fontSize: "13px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0 }}>
+                ou clique para selecionar o arquivo .csv
+              </p>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+              }}
+            />
+          </div>
         )}
 
         {stage === "review" && (
           <>
-            {/* File badge */}
             <div style={{
               display: "flex", alignItems: "center", gap: "10px",
               background: "rgba(0,212,170,0.08)", border: "1px solid rgba(0,212,170,0.2)",
@@ -251,7 +280,6 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
                       transition: "all 0.18s",
                     }}
                   >
-                    {/* Checkbox */}
                     <div style={{
                       width: "22px", height: "22px", borderRadius: "8px",
                       border: `2px solid ${isChecked ? d.color : "var(--border)"}`,
@@ -297,7 +325,6 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
               })}
             </div>
 
-            {/* Summary + CTA */}
             {confirmed.size > 0 && (
               <div style={{
                 background: "rgba(0,212,170,0.06)", border: "1px solid rgba(0,212,170,0.2)",

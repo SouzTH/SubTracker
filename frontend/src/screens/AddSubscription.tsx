@@ -38,12 +38,23 @@ export default function AddSubscription({ subs, setSubs, navigate }: Props) {
     setStep("details");
   };
 
-  // FUNÇÃO ATUALIZADA PARA ENVIAR PARA O JSON SERVER
+  // FUNÇÃO ATUALIZADA PARA ENVIAR O USER ID
   const handleSave = async () => {
     if (!selected || !value) return;
     
-    const newSub: Subscription = {
-      id: Date.now(),
+    // 1. Resgata os dados do usuário ativo
+    const userStorage = localStorage.getItem('subtracker_user');
+    if (!userStorage) {
+        alert("Sessão expirada. Faça login novamente.");
+        return;
+    }
+    const currentUser = JSON.parse(userStorage);
+
+    // 2. Monta o objeto com a propriedade userId incluída
+    // O tipo 'any' é usado temporariamente para o TypeScript não reclamar da nova propriedade
+    const newSub: any = {
+      id: Date.now().toString(), // Convertido para string para total compatibilidade com json-server
+      userId: currentUser.id,    // VINCULA A ASSINATURA AO SEU USUÁRIO
       name: selected.name,
       category,
       value: parseFloat(value.replace(",", ".")),

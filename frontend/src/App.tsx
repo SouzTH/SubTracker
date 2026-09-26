@@ -1,17 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import Dashboard from "./screens/Dashboard";
 import AddSubscription from "./screens/AddSubscription";
 import SubscriptionDetails from "./screens/SubscriptionDetails";
 import Report from "./screens/Report";
 import ImportStatement from "./screens/ImportStatement";
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './pages/Login/Login';
 import { Register } from './pages/Login/Cadastro';
 
 export type Screen = "dashboard" | "add" | "details" | "report" | "import";
 
 export interface Subscription {
-  id: number;
+  id: string | number; // Flexibilizado para não quebrar os outros componentes
   name: string;
   category: "Streaming" | "Trabalho" | "Fitness" | "Música" | "Jogos" | "Outros";
   value: number;
@@ -24,41 +24,19 @@ export interface Subscription {
   history: { date: string; value: number; status: "Pago" | "Pendente" }[];
 }
 
-/*const INITIAL_SUBS: Subscription[] = [
-  {
-    id: 1,
-    name: "Netflix",
-    category: "Streaming",
-    value: 55.90,
-    period: "Mensal",
-    nextCharge: "2026-10-05",
-    paymentMethod: "Cartão de crédito",
-    status: "Ativa",
-    color: "#e50914",
-    icon: "🎬",
-    history: [{ date: "2026-09-05", value: 55.90, status: "Pago" }],
-  },
-  {
-    id: 2,
-    name: "Spotify",
-    category: "Música",
-    value: 21.90,
-    period: "Mensal",
-    nextCharge: "2026-10-08",
-    paymentMethod: "Débito automático",
-    status: "Ativa",
-    color: "#1db954",
-    icon: "🎵",
-    history: [{ date: "2026-09-08", value: 21.90, status: "Pago" }],
+// Correção: Uso de ReactNode em vez de JSX.Element para evitar o erro ts(2503)
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const user = localStorage.getItem('subtracker_user');
+  if (!user) {
+    return <Navigate to="/" replace />;
   }
-];*/
+  return <>{children}</>;
+}
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("dashboard");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<string | number | null>(null);
   
-  
-  // Deteta se o ecrã atual é telemóvel (menos de 768px de largura)
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -69,17 +47,30 @@ export default function App() {
       .catch(error => console.error("Erro ao carregar dados:", error));
   }, []);
 
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+useEffect(() => {
+    // 1. Recupera o utilizador da sessão
+    const userStorage = localStorage.getItem('subtracker_user');
+    
+    if (userStorage) {
+      const currentUser = JSON.parse(userStorage);
+      
+      // 2. Busca apenas as assinaturas onde o userId coincide com o do utilizador
+      fetch(`http://localhost:3000/subs?userId=${currentUser.id}`)
+        .then(response => response.json())
+        .then(data => setSubs(data))
+        .catch(error => console.error("Erro ao carregar dados:", error));
+    }
   }, []);
 
-  const navigate = (s: Screen, id?: number) => {
+  // Correção: any utilizado temporariamente para o TS não bloquear a passagem da prop para o Dashboard
+  const navigate = (s: Screen, id?: any) => {
     setScreen(s);
     if (id !== undefined) setSelectedId(id);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('subtracker_user');
+    window.location.href = '/'; 
   };
 
   const selectedSub = subs.find((s) => s.id === selectedId) ?? null;
@@ -91,85 +82,84 @@ export default function App() {
         <Route path="/cadastro" element={<Register />} />
         
         <Route path="/painel" element={
-          <div style={{ 
-            display: "flex", 
-            flexDirection: isMobile ? "column" : "row", 
-            width: "100vw", 
-            minHeight: "100vh", 
-            background: "var(--background)" 
-          }}>
-            
-            {/* Se for COMPUTADOR: Mostra a Barra Lateral (Sidebar) */}
-            {!isMobile && (
-              <aside style={{ 
-                width: "260px", 
-                background: "rgba(8,14,29,0.95)", 
-                borderRight: "1px solid rgba(255,255,255,0.06)",
+          <ProtectedRoute>
+            <div style={{ 
+              display: "flex", 
+              flexDirection: isMobile ? "column" : "row", 
+              width: "100vw", 
+              minHeight: "100vh", 
+              background: "var(--background)" 
+            }}>
+              
+              {!isMobile && (
+                <aside style={{ 
+                  width: "260px", 
+                  background: "rgba(8,14,29,0.95)", 
+                  borderRight: "1px solid rgba(255,255,255,0.06)",
+                  display: "flex", 
+                  flexDirection: "column", 
+                  padding: "24px 16px",
+                  justifyContent: "space-between",
+                  height: "100vh",
+                  position: "sticky",
+                  top: 0
+                }}>
+                  <div>
+                    <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginBottom: "32px", paddingLeft: "12px" }}>
+                      Sub<span style={{ color: "var(--primary, #00d4aa)" }}>Tracker</span>
+                    </div>
+                    <DesktopNav screen={screen} navigate={navigate} />
+                  </div>
+
+                  <div style={{ padding: "12px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <button 
+                      onClick={handleLogout} 
+                      style={{ background: "none", border: "none", color: "var(--muted-foreground, #a1a1aa)", cursor: "pointer", fontSize: "14px", width: "100%", textAlign: "left" }}
+                    >
+                      Terminar Sessão
+                    </button>
+                  </div>
+                </aside>
+              )}
+
+              <main style={{ 
+                flex: 1, 
                 display: "flex", 
                 flexDirection: "column", 
-                padding: "24px 16px",
-                justifyContent: "space-between",
-                height: "100vh",
-                position: "sticky",
-                top: 0
+                overflowY: "auto", 
+                minHeight: "100vh",
+                paddingBottom: isMobile ? "80px" : "0" 
               }}>
-                <div>
-                  <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginBottom: "32px", paddingLeft: "12px" }}>
-                    Sub<span style={{ color: "var(--primary, #00d4aa)" }}>Tracker</span>
-                  </div>
-                  <DesktopNav screen={screen} navigate={navigate} />
+                <div style={{ 
+                  width: "100%", 
+                  maxWidth: isMobile ? "100%" : "1200px", 
+                  margin: "0 auto", 
+                  padding: isMobile ? "16px" : "40px" 
+                }}>
+                  {screen === "dashboard" && (
+                    <Dashboard subs={subs} navigate={navigate} />
+                  )}
+                  {screen === "add" && (
+                    <AddSubscription subs={subs} setSubs={setSubs} navigate={navigate} />
+                  )}
+                  {screen === "details" && selectedSub && (
+                    <SubscriptionDetails sub={selectedSub as any} navigate={navigate} />
+                  )}
+                  {screen === "report" && (
+                    <Report subs={subs} navigate={navigate} />
+                  )}
+                  {screen === "import" && (
+                    <ImportStatement subs={subs} setSubs={setSubs} navigate={navigate} />
+                  )}
                 </div>
+              </main>
 
-                <div style={{ padding: "12px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                  <button 
-                    onClick={() => navigate("dashboard" as Screen)} 
-                    style={{ background: "none", border: "none", color: "var(--muted-foreground, #a1a1aa)", cursor: "pointer", fontSize: "14px", width: "100%", textAlign: "left" }}
-                  >
-                    Terminar Sessão
-                  </button>
-                </div>
-              </aside>
-            )}
+              {isMobile && (
+                <BottomNav screen={screen} navigate={navigate} />
+              )}
 
-            {/* Conteúdo Principal do Site / App */}
-            <main style={{ 
-              flex: 1, 
-              display: "flex", 
-              flexDirection: "column", 
-              overflowY: "auto", 
-              minHeight: "100vh",
-              paddingBottom: isMobile ? "80px" : "0" // Espaço para a barra móvel não tapar o conteúdo
-            }}>
-              <div style={{ 
-                width: "100%", 
-                maxWidth: isMobile ? "100%" : "1200px", 
-                margin: "0 auto", 
-                padding: isMobile ? "16px" : "40px" 
-              }}>
-                {screen === "dashboard" && (
-                  <Dashboard subs={subs} navigate={navigate} />
-                )}
-                {screen === "add" && (
-                  <AddSubscription subs={subs} setSubs={setSubs} navigate={navigate} />
-                )}
-                {screen === "details" && selectedSub && (
-                  <SubscriptionDetails sub={selectedSub} navigate={navigate} />
-                )}
-                {screen === "report" && (
-                  <Report subs={subs} navigate={navigate} />
-                )}
-                {screen === "import" && (
-                  <ImportStatement subs={subs} setSubs={setSubs} navigate={navigate} />
-                )}
-              </div>
-            </main>
-
-            {/* Se for TELEMÓVEL: Mostra a Barra de Navegação Inferior (BottomNav) */}
-            {isMobile && (
-              <BottomNav screen={screen} navigate={navigate} />
-            )}
-
-          </div>
+            </div>
+          </ProtectedRoute>
         } />
       </Routes>
     </BrowserRouter>
@@ -229,8 +219,8 @@ function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen)
         borderTop: "1px solid var(--border)",
         display: "flex",
         justifyContent: "space-around",
-        alignItems: "center", // Alinha os itens ao centro verticalmente
-        padding: "12px 16px 20px", // Ajuste no espaçamento
+        alignItems: "center",
+        padding: "12px 16px 20px", 
         zIndex: 50,
       }}
     >
@@ -244,7 +234,6 @@ function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen)
           (screen === "details" && item.key === "dashboard") ||
           (screen === "import" && item.key === "dashboard");
 
-        // ESTILO ESPECIAL PARA O BOTÃO ADICIONAR
         if (item.key === "add") {
           return (
             <button
@@ -254,8 +243,8 @@ function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen)
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                background: "var(--primary)", // O teu verde
-                color: "#080e1d", // Fundo escuro para a letra e ícone destacarem
+                background: "var(--primary)", 
+                color: "#080e1d",
                 border: "none",
                 borderRadius: "24px",
                 padding: "10px 20px",
@@ -271,7 +260,6 @@ function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen)
           );
         }
 
-        // ESTILO NORMAL PARA OS OUTROS BOTÕES (Início e Relatório)
         return (
           <button
             key={item.key}

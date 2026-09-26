@@ -6,12 +6,36 @@ export function Register() {
     const [nome, setNome] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [erro, setErro] = useState('');
     
     const navigate = useNavigate();
 
-    const handleRegister = (e: FormEvent<HTMLFormElement>) => {
+    const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault(); 
-        navigate('/'); 
+        setErro('');
+
+        try {
+            const checkResponse = await fetch(`http://localhost:3000/users?email=${email}`);
+            const existingUsers = await checkResponse.json();
+
+            if (existingUsers.length > 0) {
+                setErro('Este email já se encontra registado.');
+                return;
+            }
+
+            const response = await fetch('http://localhost:3000/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome, email, password })
+            });
+
+            if (response.ok) {
+                alert('Conta criada com sucesso! Por favor, faça login.');
+                navigate('/'); 
+            }
+        } catch (error) {
+            setErro('Erro ao comunicar com o servidor.');
+        }
     };
 
     return (
@@ -20,6 +44,8 @@ export function Register() {
                 <form onSubmit={handleRegister}>
                     <h1>Criar Conta</h1>
                     
+                    {erro && <div style={{ color: '#ff4444', marginBottom: '16px', textAlign: 'center', fontSize: '14px' }}>{erro}</div>}
+
                     <div className="input-box">
                         <input 
                             type="text" 

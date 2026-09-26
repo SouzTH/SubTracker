@@ -7,7 +7,7 @@ const CANCEL_URLS: Record<string, string> = {
   "HBO Max": "https://www.max.com/pt-br/account",
   "Adobe Creative": "https://account.adobe.com/plans",
   "GitHub Pro": "https://github.com/settings/billing",
-  "Academia Smart": "https://www.smartfit.com.br/cancelamento",
+  "Academia": "https://www.smartfit.com.br/cancelamento", // <-- Corrigido para bater certo com a criação
   "PlayStation+": "https://www.playstation.com/pt-br/support/subscriptions/cancel-ps-plus/",
 };
 

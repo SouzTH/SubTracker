@@ -3,7 +3,7 @@ import { Subscription, Screen } from "../App"
 
 interface Props {
   subs: Subscription[]
-  navigate: (s: Screen, id?: number) => void
+  navigate: (screen: Screen, id?: string | number) => void;
 }
 
 function formatDate(iso: string) {
@@ -11,14 +11,17 @@ function formatDate(iso: string) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
 }
 
-function daysUntil(iso: string) {
-  const today = new Date("2026-09-01")
-  const d = new Date(iso + "T00:00:00")
-  const diff = Math.ceil(
-    (d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-  )
-  return diff
-}
+const daysUntil = (dateString: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); 
+    
+    // Divide "2026-10-01" em partes numéricas seguras
+    const [year, month, day] = dateString.split('-').map(Number);
+    const target = new Date(year, month - 1, day);
+    
+    const diffTime = target.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
 
 function fmt(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -44,6 +47,14 @@ const CATEGORY_LIMITS: Record<string, number> = {
 
 export default function Dashboard({ subs, navigate }: Props) {
   
+  // LÓGICA DINÂMICA INSERIDA AQUI:
+  const userStorage = localStorage.getItem('subtracker_user');
+  const currentUser = userStorage ? JSON.parse(userStorage) : { nome: 'Usuário' };
+
+  const currentMonthName = new Date().toLocaleString('pt-BR', { month: 'long' });
+  const currentYear = new Date().getFullYear();
+  const formattedDateString = `${currentMonthName.charAt(0).toUpperCase() + currentMonthName.slice(1)} ${currentYear}`;
+  // FIM DA LÓGICA DINÂMICA
 
   const active = subs.filter((s) => s.status === "Ativa")
   const total = active.reduce((acc, s) => acc + s.value, 0)
@@ -81,7 +92,7 @@ export default function Dashboard({ subs, navigate }: Props) {
                 fontWeight: "bold",
               }}
             >
-              Olá, Matheus!
+              Olá, {currentUser.nome}!
             </p>
             <p
               style={{
@@ -90,7 +101,7 @@ export default function Dashboard({ subs, navigate }: Props) {
                 fontFamily: "Inter, sans-serif",
               }}
             >
-              Setembro 2026
+              {formattedDateString}
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -468,7 +479,6 @@ export default function Dashboard({ subs, navigate }: Props) {
           })}
         </div>
       </div>
-
     </div>
   )
 }
