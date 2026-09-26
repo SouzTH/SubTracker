@@ -4,14 +4,18 @@ import AddSubscription from "./screens/AddSubscription";
 import SubscriptionDetails from "./screens/SubscriptionDetails";
 import Report from "./screens/Report";
 import ImportStatement from "./screens/ImportStatement";
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Profile from "./screens/Profile";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Login } from './pages/Login/Login';
 import { Register } from './pages/Login/Cadastro';
+import { ForgotPassword } from './pages/Login/ForgotPassword';
+import EditSubscription from "./screens/EditSubscription";
 
-export type Screen = "dashboard" | "add" | "details" | "report" | "import";
+export type Screen = "dashboard" | "add" | "edit" | "details" | "report" | "import" | "profile";
 
 export interface Subscription {
   id: string | number; // Flexibilizado para não quebrar os outros componentes
+  userId?: string;
   name: string;
   category: "Streaming" | "Trabalho" | "Fitness" | "Música" | "Jogos" | "Outros";
   value: number;
@@ -24,9 +28,44 @@ export interface Subscription {
   history: { date: string; value: number; status: "Pago" | "Pendente" }[];
 }
 
+export type CategoryBudgets = Record<Subscription["category"], number>;
+
+export const DEFAULT_BUDGETS: CategoryBudgets = {
+  Streaming: 120,
+  Trabalho: 350,
+  Fitness: 100,
+  Música: 30,
+  Jogos: 80,
+  Outros: 50,
+};
+
+export interface CurrentUser {
+  id: string;
+  nome: string;
+  email: string;
+  telefone?: string;
+  paymentMethod?: string;
+  budgets?: CategoryBudgets;
+}
+
+const SESSION_KEY = "subtracker_user";
+
+export function getStoredUser(): CurrentUser | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as CurrentUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredUser(user: CurrentUser) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+}
+
 // Correção: Uso de ReactNode em vez de JSX.Element para evitar o erro ts(2503)
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const user = localStorage.getItem('subtracker_user');
+  const user = localStorage.getItem(SESSION_KEY);
   if (!user) {
     return <Navigate to="/" replace />;
   }
@@ -34,135 +73,168 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/cadastro" element={<Register />} />
+        <Route path="/esqueci-senha" element={<ForgotPassword />} />
+        <Route
+          path="/painel"
+          element={
+            <ProtectedRoute>
+              <Painel />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+function Painel() {
+  const routerNavigate = useNavigate();
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
-  
+
   const [subs, setSubs] = useState<Subscription[]>([]);
+  const [user, setUser] = useState<CurrentUser | null>(() => getStoredUser());
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
+  // Busca apenas as assinaturas do utilizador com sessão iniciada.
   useEffect(() => {
-    fetch("http://localhost:3000/subs")
+    if (!user) return;
+    fetch(`http://localhost:3000/subs?userId=${user.id}`)
       .then(response => response.json())
       .then(data => setSubs(data))
       .catch(error => console.error("Erro ao carregar dados:", error));
+  }, [user]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-useEffect(() => {
-    // 1. Recupera o utilizador da sessão
-    const userStorage = localStorage.getItem('subtracker_user');
-    
-    if (userStorage) {
-      const currentUser = JSON.parse(userStorage);
-      
-      // 2. Busca apenas as assinaturas onde o userId coincide com o do utilizador
-      fetch(`http://localhost:3000/subs?userId=${currentUser.id}`)
-        .then(response => response.json())
-        .then(data => setSubs(data))
-        .catch(error => console.error("Erro ao carregar dados:", error));
-    }
-  }, []);
-
-  // Correção: any utilizado temporariamente para o TS não bloquear a passagem da prop para o Dashboard
   const navigate = (s: Screen, id?: any) => {
     setScreen(s);
     if (id !== undefined) setSelectedId(id);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('subtracker_user');
-    window.location.href = '/'; 
+    localStorage.removeItem(SESSION_KEY); // Remove a sessão do navegador
+    setSubs([]); // <-- Limpa as assinaturas do ecrã
+    setUser(null); // <-- Limpa o utilizador da memória
+    routerNavigate('/');
+  };
+
+  // Chamado pela tela de Perfil depois de salvar no servidor, para refletir
+  // as mudanças (nome, metas por categoria, etc.) em toda a aplicação na hora.
+  const handleUserUpdate = (updated: CurrentUser) => {
+    setUser(updated);
+    saveStoredUser(updated);
   };
 
   const selectedSub = subs.find((s) => s.id === selectedId) ?? null;
 
+  if (!user) return null;
+
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/cadastro" element={<Register />} />
-        
-        <Route path="/painel" element={
-          <ProtectedRoute>
-            <div style={{ 
-              display: "flex", 
-              flexDirection: isMobile ? "column" : "row", 
-              width: "100vw", 
-              minHeight: "100vh", 
-              background: "var(--background)" 
-            }}>
-              
-              {!isMobile && (
-                <aside style={{ 
-                  width: "260px", 
-                  background: "rgba(8,14,29,0.95)", 
-                  borderRight: "1px solid rgba(255,255,255,0.06)",
-                  display: "flex", 
-                  flexDirection: "column", 
-                  padding: "24px 16px",
-                  justifyContent: "space-between",
-                  height: "100vh",
-                  position: "sticky",
-                  top: 0
-                }}>
-                  <div>
-                    <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginBottom: "32px", paddingLeft: "12px" }}>
-                      Sub<span style={{ color: "var(--primary, #00d4aa)" }}>Tracker</span>
-                    </div>
-                    <DesktopNav screen={screen} navigate={navigate} />
-                  </div>
+    <div style={{
+      display: "flex",
+      flexDirection: isMobile ? "column" : "row",
+      width: "100vw",
+      minHeight: "100vh",
+      background: "var(--background)"
+    }}>
 
-                  <div style={{ padding: "12px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                    <button 
-                      onClick={handleLogout} 
-                      style={{ background: "none", border: "none", color: "var(--muted-foreground, #a1a1aa)", cursor: "pointer", fontSize: "14px", width: "100%", textAlign: "left" }}
-                    >
-                      Terminar Sessão
-                    </button>
-                  </div>
-                </aside>
-              )}
-
-              <main style={{ 
-                flex: 1, 
-                display: "flex", 
-                flexDirection: "column", 
-                overflowY: "auto", 
-                minHeight: "100vh",
-                paddingBottom: isMobile ? "80px" : "0" 
-              }}>
-                <div style={{ 
-                  width: "100%", 
-                  maxWidth: isMobile ? "100%" : "1200px", 
-                  margin: "0 auto", 
-                  padding: isMobile ? "16px" : "40px" 
-                }}>
-                  {screen === "dashboard" && (
-                    <Dashboard subs={subs} navigate={navigate} />
-                  )}
-                  {screen === "add" && (
-                    <AddSubscription subs={subs} setSubs={setSubs} navigate={navigate} />
-                  )}
-                  {screen === "details" && selectedSub && (
-                    <SubscriptionDetails sub={selectedSub as any} navigate={navigate} />
-                  )}
-                  {screen === "report" && (
-                    <Report subs={subs} navigate={navigate} />
-                  )}
-                  {screen === "import" && (
-                    <ImportStatement subs={subs} setSubs={setSubs} navigate={navigate} />
-                  )}
-                </div>
-              </main>
-
-              {isMobile && (
-                <BottomNav screen={screen} navigate={navigate} />
-              )}
-
+      {!isMobile && (
+        <aside style={{
+          width: "260px",
+          background: "rgba(8,14,29,0.95)",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
+          display: "flex",
+          flexDirection: "column",
+          padding: "24px 16px",
+          justifyContent: "space-between",
+          height: "100vh",
+          position: "sticky",
+          top: 0
+        }}>
+          <div>
+            <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginBottom: "32px", paddingLeft: "12px" }}>
+              Sub<span style={{ color: "var(--primary, #00d4aa)" }}>Tracker</span>
             </div>
-          </ProtectedRoute>
-        } />
-      </Routes>
-    </BrowserRouter>
+            <DesktopNav screen={screen} navigate={navigate} />
+          </div>
+
+          <div style={{ padding: "12px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            <p style={{
+              fontSize: "13px",
+              color: "var(--foreground, #fff)",
+              fontWeight: 600,
+              margin: "0 0 8px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}>
+              {user.nome}
+            </p>
+            <button
+              onClick={handleLogout}
+              style={{ background: "none", border: "none", color: "var(--muted-foreground, #a1a1aa)", cursor: "pointer", fontSize: "14px", width: "100%", textAlign: "left" }}
+            >
+              Terminar Sessão
+            </button>
+          </div>
+        </aside>
+      )}
+
+      <main style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+        minHeight: "100vh",
+        paddingBottom: isMobile ? "80px" : "0"
+      }}>
+        <div style={{
+          width: "100%",
+          maxWidth: isMobile ? "100%" : "1200px",
+          margin: "0 auto",
+          padding: isMobile ? "16px" : "40px"
+        }}>
+          {screen === "dashboard" && (
+            <Dashboard subs={subs} navigate={navigate} budgets={user.budgets ?? DEFAULT_BUDGETS} />
+          )}
+          {screen === "add" && (
+            <AddSubscription subs={subs} setSubs={setSubs} navigate={navigate} />
+          )}
+
+          {screen === "edit" && selectedSub && (
+            <EditSubscription sub={selectedSub as any} subs={subs} setSubs={setSubs} navigate={navigate} />
+          )}
+          
+          {screen === "details" && selectedSub && (
+            <SubscriptionDetails sub={selectedSub as any} subs={subs} setSubs={setSubs} navigate={navigate} />
+          )}
+          {screen === "report" && (
+            <Report subs={subs} navigate={navigate} />
+          )}
+          {screen === "import" && (
+            <ImportStatement subs={subs} setSubs={setSubs} navigate={navigate} />
+          )}
+          {screen === "profile" && (
+            <Profile user={user} onUserUpdate={handleUserUpdate} onLogout={handleLogout} navigate={navigate} />
+          )}
+        </div>
+      </main>
+
+      {isMobile && (
+        <BottomNav screen={screen} navigate={navigate} />
+      )}
+
+    </div>
   );
 }
 
@@ -174,8 +246,9 @@ function DesktopNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen
         { key: "report", icon: "◎", label: "Relatórios" },
         { key: "add", icon: "+", label: "Nova Subscrição" },
         { key: "import", icon: "📄", label: "Importar Fatura" },
+        { key: "profile", icon: "👤", label: "Meu Perfil" },
       ].map((item) => {
-        const active = screen === item.key || (screen === "details" && item.key === "dashboard");
+        const active = screen === item.key || ((screen === "details" || screen === "edit") && item.key === "dashboard");
         return (
           <button
             key={item.key}
@@ -220,7 +293,7 @@ function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen)
         display: "flex",
         justifyContent: "space-around",
         alignItems: "center",
-        padding: "12px 16px 20px", 
+        padding: "12px 16px 20px",
         zIndex: 50,
       }}
     >
@@ -232,7 +305,9 @@ function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen)
         const active =
           screen === item.key ||
           (screen === "details" && item.key === "dashboard") ||
-          (screen === "import" && item.key === "dashboard");
+          (screen === "edit" && item.key === "dashboard") ||
+          (screen === "import" && item.key === "dashboard") ||
+          (screen === "profile" && item.key === "dashboard");
 
         if (item.key === "add") {
           return (
@@ -243,7 +318,7 @@ function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen)
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                background: "var(--primary)", 
+                background: "var(--primary)",
                 color: "#080e1d",
                 border: "none",
                 borderRadius: "24px",

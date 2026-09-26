@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Subscription, Screen } from "../App";
 
 const CANCEL_URLS: Record<string, string> = {
@@ -7,13 +8,22 @@ const CANCEL_URLS: Record<string, string> = {
   "HBO Max": "https://www.max.com/pt-br/account",
   "Adobe Creative": "https://account.adobe.com/plans",
   "GitHub Pro": "https://github.com/settings/billing",
-  "Academia": "https://www.smartfit.com.br/cancelamento", // <-- Corrigido para bater certo com a criação
+  "Academia": "https://www.smartfit.com.br/cancelamento",
   "PlayStation+": "https://www.playstation.com/pt-br/support/subscriptions/cancel-ps-plus/",
 };
 
 interface Props {
   sub: Subscription;
-  navigate: (s: Screen) => void;
+  subs: Subscription[];
+  setSubs: (s: Subscription[]) => void;
+  navigate: (s: Screen, id?: string | number) => void;
+}
+
+function addCycle(iso: string, period: Subscription["period"]): string {
+  const d = new Date(iso + "T00:00:00");
+  const months = period === "Mensal" ? 1 : period === "Trimestral" ? 3 : 12;
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
 }
 
 function fmt(v: number) {
@@ -25,7 +35,68 @@ function formatDate(iso: string) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
-export default function SubscriptionDetails({ sub, navigate }: Props) {
+export default function SubscriptionDetails({ sub, subs, setSubs, navigate }: Props) {
+  const [busy, setBusy] = useState<"pause" | "pay" | "delete" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const patchSub = async (patch: Partial<Subscription>) => {
+    const response = await fetch(`http://localhost:3000/subs/${sub.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!response.ok) throw new Error("Falha ao atualizar assinatura");
+    const updated = await response.json();
+    setSubs(subs.map((s) => (s.id === sub.id ? updated : s)));
+  };
+
+  const handleTogglePause = async () => {
+    setBusy("pause");
+    setError(null);
+    try {
+      await patchSub({ status: sub.status === "Ativa" ? "Pausada" : "Ativa" });
+    } catch (e) {
+      console.error(e);
+      setError("Não foi possível atualizar o status. Tente novamente.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    setBusy("pay");
+    setError(null);
+    try {
+      const newEntry = { date: sub.nextCharge, value: sub.value, status: "Pago" as const };
+      await patchSub({
+        history: [...sub.history, newEntry],
+        nextCharge: addCycle(sub.nextCharge, sub.period),
+      });
+    } catch (e) {
+      console.error(e);
+      setError("Não foi possível confirmar o pagamento. Tente novamente.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    const ok = window.confirm(`Tem certeza que deseja excluir "${sub.name}"? Essa ação não pode ser desfeita.`);
+    if (!ok) return;
+    setBusy("delete");
+    setError(null);
+    try {
+      const response = await fetch(`http://localhost:3000/subs/${sub.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Falha ao excluir");
+      setSubs(subs.filter((s) => s.id !== sub.id));
+      navigate("dashboard");
+    } catch (e) {
+      console.error(e);
+      setError("Não foi possível excluir a assinatura. Tente novamente.");
+      setBusy(null);
+    }
+  };
+
   return (
     <div style={{ flex: 1, overflowY: "auto" }}>
       {/* Header with gradient */}
@@ -179,18 +250,53 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
 
       {/* Actions */}
       <div style={{ padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: "10px" }}>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button style={{
-            flex: 1, padding: "14px",
-            borderRadius: "14px", border: "1px solid var(--border)",
-            background: "var(--card)",
-            color: "var(--muted-foreground)",
-            fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "14px",
-            cursor: "pointer",
+        {error && (
+          <div style={{
+            background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
+            borderRadius: "12px", padding: "12px 14px",
+            color: "#ef4444", fontFamily: "Inter, sans-serif", fontSize: "13px",
           }}>
-            {sub.status === "Ativa" ? "⏸ Pausar" : "▶ Reativar"}
+            {error}
+          </div>
+        )}
+
+        {sub.status === "Ativa" && (
+          <button
+            onClick={handleConfirmPayment}
+            disabled={busy !== null}
+            style={{
+              padding: "14px",
+              borderRadius: "14px", border: "none",
+              background: "var(--primary)",
+              color: "var(--primary-foreground)",
+              fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "14px",
+              cursor: busy !== null ? "not-allowed" : "pointer",
+              opacity: busy !== null && busy !== "pay" ? 0.6 : 1,
+            }}
+          >
+            {busy === "pay" ? "Confirmando..." : "✓ Confirmar Pagamento"}
           </button>
-          <button onClick={() => navigate("add")} style={{
+        )}
+
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            onClick={handleTogglePause}
+            disabled={busy !== null}
+            style={{
+              flex: 1, padding: "14px",
+              borderRadius: "14px", border: "1px solid var(--border)",
+              background: "var(--card)",
+              color: "var(--muted-foreground)",
+              fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "14px",
+              cursor: busy !== null ? "not-allowed" : "pointer",
+              opacity: busy !== null && busy !== "pause" ? 0.6 : 1,
+            }}
+          >
+            {busy === "pause" ? "..." : sub.status === "Ativa" ? "⏸ Pausar" : "▶ Reativar"}
+          </button>
+          
+          {/* 👇 AQUI ESTÁ A CORREÇÃO DO BOTÃO 👇 */}
+          <button onClick={() => navigate("edit", sub.id)} style={{
             flex: 1, padding: "14px",
             borderRadius: "14px", border: "none",
             background: "var(--primary)",
@@ -232,6 +338,26 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
             </svg>
           </a>
         )}
+
+        {/* Remover do sistema (não depende de link externo) */}
+        <button
+          onClick={handleDelete}
+          disabled={busy !== null}
+          style={{
+            padding: "14px",
+            borderRadius: "14px",
+            border: "none",
+            background: "transparent",
+            color: "#ef4444",
+            fontFamily: "Inter, sans-serif",
+            fontWeight: 600,
+            fontSize: "13px",
+            cursor: busy !== null ? "not-allowed" : "pointer",
+            opacity: busy !== null && busy !== "delete" ? 0.6 : 1,
+          }}
+        >
+          {busy === "delete" ? "Excluindo..." : "🗑 Excluir assinatura"}
+        </button>
       </div>
     </div>
   );

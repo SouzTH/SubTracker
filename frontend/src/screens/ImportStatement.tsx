@@ -14,8 +14,11 @@ interface DetectedSub {
   color: string;
   value: number;
   detectedDate: string;
+  detectedDateISO: string;
   category: Subscription["category"];
   confirmed: boolean;
+  /** Se já existe uma assinatura ativa com esse nome, o "import" vira confirmação de pagamento em vez de criar duplicata. */
+  existing: Subscription | null;
 }
 
 // Catálogo de regras para detetar serviços conhecidos no extrato
@@ -28,6 +31,19 @@ const KNOWN_SERVICES = [
   { keyword: "CANVA", name: "Canva Pro", icon: "🖌️", color: "#8b5cf6", category: "Trabalho" as const },
 ];
 
+// Converte "dd/mm/yyyy" (formato do nosso CSV) para "yyyy-mm-dd" (formato usado no resto do app)
+function toISO(dateBR: string): string {
+  const [d, m, y] = dateBR.split("/");
+  return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+}
+
+function addCycle(iso: string, period: Subscription["period"]) {
+  const d = new Date(iso + "T00:00:00");
+  const months = period === "Mensal" ? 1 : period === "Trimestral" ? 3 : 12;
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
 function fmt(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -39,6 +55,9 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
   const [detected, setDetected] = useState<DetectedSub[]>([]);
   const [confirmed, setConfirmed] = useState<Set<number>>(new Set());
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [summary, setSummary] = useState<{ novas: number; confirmadas: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // MOTOR REAL DE LEITURA DO CSV
@@ -63,6 +82,11 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
 
         if (match) {
           const absoluteValue = Math.abs(rawValue); // Converte para positivo
+          // Já existe uma assinatura ativa com este nome? Então isso é uma
+          // cobrança de algo que já monitoramos — vamos confirmar o pagamento
+          // dela em vez de criar uma assinatura duplicada.
+          const existingSub = subs.find((s) => s.status === "Ativa" && s.name.toLowerCase() === match.name.toLowerCase()) ?? null;
+
           found.push({
             id: idCounter++,
             name: match.name,
@@ -70,8 +94,10 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
             color: match.color,
             value: absoluteValue,
             detectedDate: dateStr,
+            detectedDateISO: toISO(dateStr),
             category: match.category,
             confirmed: true, // Pré-selecionado por defeito
+            existing: existingSub,
           });
         }
       }
@@ -84,6 +110,7 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
 
   const handleFile = (file: File) => {
     setFileName(file.name);
+    setError(null);
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -111,37 +138,67 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
         return;
     }
     const currentUser = JSON.parse(userStorage);
+    const toProcess = detected.filter((d) => confirmed.has(d.id));
 
-    const toAdd = detected
-      .filter((d) => confirmed.has(d.id))
-      .map((d) => ({
-        id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
-        userId: currentUser.id,
-        name: d.name,
-        icon: d.icon,
-        color: d.color,
-        category: d.category,
-        value: d.value,
-        period: "Mensal" as const,
-        nextCharge: "2026-10-10",
-        paymentMethod: "Cartão de crédito",
-        status: "Ativa" as const,
-        history: [{ date: "2026-09-" + d.detectedDate.split("/")[0], value: d.value, status: "Pago" as const }],
-      }));
+    setSaving(true);
+    setError(null);
 
     try {
-      for (const newSub of toAdd) {
-        await fetch("http://localhost:3000/subs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newSub),
-        });
+      const nextSubs = [...subs];
+      let novas = 0;
+      let confirmadas = 0;
+
+      for (const d of toProcess) {
+        if (d.existing) {
+          // Já existe: confirma o pagamento do ciclo atual em vez de duplicar.
+          const updatedHistory = [...d.existing.history, { date: d.detectedDateISO, value: d.value, status: "Pago" as const }];
+          const updatedNextCharge = addCycle(d.detectedDateISO, d.existing.period);
+          const response = await fetch(`http://localhost:3000/subs/${d.existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ history: updatedHistory, nextCharge: updatedNextCharge }),
+          });
+          if (!response.ok) throw new Error(`Falha ao confirmar pagamento de ${d.name}`);
+          const updated = await response.json();
+          const idx = nextSubs.findIndex((s) => s.id === d.existing!.id);
+          if (idx >= 0) nextSubs[idx] = updated;
+          confirmadas++;
+        } else {
+          // Novo: cria a assinatura com as datas reais detectadas no extrato.
+          const newSub = {
+            userId: currentUser.id,
+            name: d.name,
+            icon: d.icon,
+            color: d.color,
+            category: d.category,
+            value: d.value,
+            period: "Mensal" as const,
+            nextCharge: addCycle(d.detectedDateISO, "Mensal"),
+            paymentMethod: "Cartão de crédito",
+            status: "Ativa" as const,
+            history: [{ date: d.detectedDateISO, value: d.value, status: "Pago" as const }],
+          };
+          const response = await fetch("http://localhost:3000/subs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newSub),
+          });
+          if (!response.ok) throw new Error(`Falha ao criar ${d.name}`);
+          const created = await response.json();
+          nextSubs.push(created);
+          novas++;
+        }
       }
-      setSubs([...subs, ...toAdd]);
+
+      setSubs(nextSubs);
+      setSummary({ novas, confirmadas });
       setSaved(true);
-      setTimeout(() => navigate("dashboard"), 1400);
+      setTimeout(() => navigate("dashboard"), 1600);
     } catch (error) {
-      console.error("Erro ao salvar assinaturas importadas:", error);
+      console.error("Erro ao processar extrato importado:", error);
+      setError("Não foi possível salvar no servidor. Verifique se o json-server está rodando (npm run server) e tente novamente.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -307,8 +364,16 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
                       <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "15px", margin: "0 0 3px" }}>
                         {d.name}
                       </p>
-                      <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0 }}>
-                        Detectado em {d.detectedDate} · {d.category}
+                      <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0, display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                        <span>Detectado em {d.detectedDate} · {d.category}</span>
+                        <span style={{
+                          fontSize: "10px", padding: "1px 7px", borderRadius: "8px",
+                          background: d.existing ? "rgba(0,212,170,0.15)" : "rgba(148,163,184,0.15)",
+                          color: d.existing ? "var(--primary)" : "var(--muted-foreground)",
+                          fontWeight: 600,
+                        }}>
+                          {d.existing ? "confirma pagamento" : "nova assinatura"}
+                        </span>
                       </p>
                     </div>
 
@@ -343,22 +408,39 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
               </div>
             )}
 
+            {error && (
+              <div style={{
+                background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
+                borderRadius: "12px", padding: "12px 14px", marginBottom: "16px",
+                color: "#ef4444", fontFamily: "Inter, sans-serif", fontSize: "13px",
+              }}>
+                {error}
+              </div>
+            )}
+
             <button
               onClick={handleSave}
-              disabled={confirmed.size === 0 || saved}
+              disabled={confirmed.size === 0 || saved || saving}
               style={{
                 width: "100%", padding: "16px",
                 borderRadius: "16px", border: "none",
-                background: confirmed.size > 0 && !saved ? "var(--primary)" : "var(--muted)",
-                color: confirmed.size > 0 && !saved ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                background: confirmed.size > 0 && !saved && !saving ? "var(--primary)" : "var(--muted)",
+                color: confirmed.size > 0 && !saved && !saving ? "var(--primary-foreground)" : "var(--muted-foreground)",
                 fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "16px",
-                cursor: confirmed.size > 0 && !saved ? "pointer" : "not-allowed",
+                cursor: confirmed.size > 0 && !saved && !saving ? "pointer" : "not-allowed",
                 transition: "all 0.15s",
                 marginBottom: "24px",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
               }}
             >
-              {saved ? "✓ Assinaturas adicionadas!" : `Confirmar e Monitorar${confirmed.size > 0 ? ` (${confirmed.size})` : ""}`}
+              {saved
+                ? `✓ ${summary ? [
+                    summary.novas > 0 ? `${summary.novas} nova${summary.novas > 1 ? "s" : ""}` : null,
+                    summary.confirmadas > 0 ? `${summary.confirmadas} confirmada${summary.confirmadas > 1 ? "s" : ""}` : null,
+                  ].filter(Boolean).join(" · ") : "Concluído"}!`
+                : saving
+                  ? "Salvando..."
+                  : `Confirmar e Monitorar${confirmed.size > 0 ? ` (${confirmed.size})` : ""}`}
             </button>
           </>
         )}

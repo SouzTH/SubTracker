@@ -1,27 +1,47 @@
 {
   "users": [
     {
-      "id": "1",
+      "id": "admin1",
       "nome": "Admin",
       "email": "admin@teste.com",
-      "password": "1234"
+      "password": "1234",
+      "telefone": "(21)1234-5678",
+      "paymentMethod": "Cartão de crédito",
+      "budgets": {
+        "Streaming": 120,
+        "Trabalho": 350,
+        "Fitness": 100,
+        "Música": 30,
+        "Jogos": 80,
+        "Outros": 50
+      }
     },
     {
       "nome": "Ronald",
       "email": "ronaldtx@gmail.com",
       "password": "12345",
-      "id": "OtuMY4VtnfE"
+      "id": "OtuMY4VtnfE",
+      "telefone": "",
+      "paymentMethod": "Cartão de crédito",
+      "budgets": {
+        "Streaming": 120,
+        "Trabalho": 350,
+        "Fitness": 100,
+        "Música": 30,
+        "Jogos": 80,
+        "Outros": 50
+      }
     }
   ],
   "subs": [
     {
       "id": "1",
-      "userId": "1",
+      "userId": "admin1",
       "name": "Netflix",
       "category": "Streaming",
       "value": 55.9,
       "period": "Mensal",
-      "nextCharge": "2026-10-05",
+      "nextCharge": "2026-11-05",
       "paymentMethod": "Cartão de crédito",
       "status": "Ativa",
       "color": "#e50914",
@@ -31,18 +51,23 @@
           "date": "2026-09-05",
           "value": 55.9,
           "status": "Pago"
+        },
+        {
+          "date": "2026-10-05",
+          "value": 55.9,
+          "status": "Pago"
         }
       ]
     },
     {
       "id": "2",
-      "userId": "1",
+      "userId": "admin1",
       "name": "Spotify",
       "category": "Música",
       "value": 21.9,
       "period": "Mensal",
       "nextCharge": "2026-10-08",
-      "paymentMethod": "Débito automático",
+      "paymentMethod": "Pix",
       "status": "Ativa",
       "color": "#1db954",
       "icon": "🎵",
@@ -70,7 +95,7 @@
     },
     {
       "id": "wBe6c2vU3pA",
-      "userId": "1",
+      "userId": "admin1",
       "name": "Adobe Creative",
       "category": "Trabalho",
       "value": 20,
@@ -96,41 +121,6 @@
       "history": []
     },
     {
-      "id": "qlUgFEYOd78",
-      "userId": "OtuMY4VtnfE",
-      "name": "Netflix",
-      "category": "Streaming",
-      "value": 55.9,
-      "period": "Mensal",
-      "nextCharge": "2026-10-25",
-      "paymentMethod": "Cartão de crédito",
-      "status": "Ativa",
-      "color": "#e50914",
-      "icon": "🎬",
-      "history": []
-    },
-    {
-      "id": "S-guKQ8BcsE",
-      "userId": "OtuMY4VtnfE",
-      "name": "Netflix",
-      "icon": "🎬",
-      "color": "#e50914",
-      "category": "Streaming",
-      "value": 55.9,
-      "period": "Mensal",
-      "nextCharge": "2026-10-10",
-      "paymentMethod": "Cartão de crédito",
-      "status": "Ativa",
-      "history": [
-        {
-          "date": "2026-09-05",
-          "value": 55.9,
-          "status": "Pago"
-        }
-      ]
-    },
-    {
-      "id": "DwKDK6vY_P8",
       "userId": "OtuMY4VtnfE",
       "name": "Spotify",
       "icon": "🎵",
@@ -138,7 +128,7 @@
       "category": "Música",
       "value": 21.9,
       "period": "Mensal",
-      "nextCharge": "2026-10-10",
+      "nextCharge": "2026-10-08",
       "paymentMethod": "Cartão de crédito",
       "status": "Ativa",
       "history": [
@@ -147,10 +137,10 @@
           "value": 21.9,
           "status": "Pago"
         }
-      ]
+      ],
+      "id": "AGbGH9Q0wbQ"
     },
     {
-      "id": "7ysARy6GlUQ",
       "userId": "OtuMY4VtnfE",
       "name": "Academia",
       "icon": "💪",
@@ -158,7 +148,7 @@
       "category": "Fitness",
       "value": 95,
       "period": "Mensal",
-      "nextCharge": "2026-10-10",
+      "nextCharge": "2026-10-12",
       "paymentMethod": "Cartão de crédito",
       "status": "Ativa",
       "history": [
@@ -167,30 +157,10 @@
           "value": 95,
           "status": "Pago"
         }
-      ]
+      ],
+      "id": "gV1BjF3OWqI"
     },
     {
-      "id": "hcQ7AJlQ_n8",
-      "userId": "OtuMY4VtnfE",
-      "name": "Adobe Creative",
-      "icon": "🎨",
-      "color": "#ff0000",
-      "category": "Trabalho",
-      "value": 20,
-      "period": "Mensal",
-      "nextCharge": "2026-10-10",
-      "paymentMethod": "Cartão de crédito",
-      "status": "Ativa",
-      "history": [
-        {
-          "date": "2026-09-18",
-          "value": 20,
-          "status": "Pago"
-        }
-      ]
-    },
-    {
-      "id": "BoQVJX2gFrY",
       "userId": "OtuMY4VtnfE",
       "name": "GitHub Pro",
       "icon": "💻",
@@ -198,7 +168,7 @@
       "category": "Trabalho",
       "value": 25,
       "period": "Mensal",
-      "nextCharge": "2026-10-10",
+      "nextCharge": "2026-10-22",
       "paymentMethod": "Cartão de crédito",
       "status": "Ativa",
       "history": [
@@ -207,10 +177,10 @@
           "value": 25,
           "status": "Pago"
         }
-      ]
+      ],
+      "id": "Vc8AlNmdW_I"
     },
     {
-      "id": "g3tUkpS1_-E",
       "userId": "OtuMY4VtnfE",
       "name": "Canva Pro",
       "icon": "🖌️",
@@ -218,7 +188,7 @@
       "category": "Trabalho",
       "value": 54.9,
       "period": "Mensal",
-      "nextCharge": "2026-10-10",
+      "nextCharge": "2026-10-25",
       "paymentMethod": "Cartão de crédito",
       "status": "Ativa",
       "history": [
@@ -227,7 +197,8 @@
           "value": 54.9,
           "status": "Pago"
         }
-      ]
+      ],
+      "id": "5ywJxI9QzYc"
     }
   ],
   "$schema": "./node_modules/json-server/schema.json"

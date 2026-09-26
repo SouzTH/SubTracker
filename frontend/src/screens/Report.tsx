@@ -2,7 +2,7 @@ import { Subscription, Screen } from "../App";
 
 interface Props {
   subs: Subscription[];
-  navigate: (s: Screen, id?: number) => void;
+  navigate: (s: Screen, id?: string | number) => void;
 }
 
 function fmt(v: number) {

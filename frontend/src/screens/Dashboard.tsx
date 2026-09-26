@@ -4,6 +4,7 @@ import { Subscription, Screen } from "../App"
 interface Props {
   subs: Subscription[]
   navigate: (screen: Screen, id?: string | number) => void;
+  budgets: Record<string, number>
 }
 
 function formatDate(iso: string) {
@@ -36,16 +37,7 @@ const CATEGORY_COLOR: Record<string, string> = {
   Outros: "#64748b",
 }
 
-const CATEGORY_LIMITS: Record<string, number> = {
-  Streaming: 120,
-  Trabalho: 350,
-  Fitness: 100,
-  Música: 30,
-  Jogos: 80,
-  Outros: 50,
-}
-
-export default function Dashboard({ subs, navigate }: Props) {
+export default function Dashboard({ subs, navigate, budgets }: Props) {
   
   // LÓGICA DINÂMICA INSERIDA AQUI:
   const userStorage = localStorage.getItem('subtracker_user');
@@ -128,6 +120,8 @@ export default function Dashboard({ subs, navigate }: Props) {
               Importar Extrato
             </button>
             <div
+              onClick={() => navigate("profile")}
+              title="Meu perfil"
               style={{
                 width: "40px",
                 height: "40px",
@@ -138,6 +132,7 @@ export default function Dashboard({ subs, navigate }: Props) {
                 justifyContent: "center",
                 fontSize: "18px",
                 flexShrink: 0,
+                cursor: "pointer",
               }}
             >
               👤
@@ -223,7 +218,7 @@ export default function Dashboard({ subs, navigate }: Props) {
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           {usedCategories.map(([cat, spent]) => {
-            const limit = CATEGORY_LIMITS[cat] ?? 100
+            const limit = budgets[cat] ?? 100
             const pct = Math.min((spent / limit) * 100, 100)
             const over = spent > limit
             const color = CATEGORY_COLOR[cat] ?? "#64748b"

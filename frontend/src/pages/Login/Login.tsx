@@ -27,7 +27,9 @@ export function Login() {
             const userMatch = users.find((u: any) => u.email === cleanEmail && u.password === password);
 
             if (userMatch) {
-                localStorage.setItem('subtracker_user', JSON.stringify(userMatch));
+                // Não guarda a senha no localStorage — só o que a interface precisa.
+                const { password: _senha, ...safeUser } = userMatch;
+                localStorage.setItem('subtracker_user', JSON.stringify(safeUser));
                 navigate('/painel'); 
             } else {
                 setErro('Email ou palavra-passe incorretos!');
@@ -72,6 +74,7 @@ export function Login() {
                     
                     <div className="auth-link">
                         <p>Não tem uma conta? <a href="#" onClick={(e) => { e.preventDefault(); navigate('/cadastro'); }}>Cadastre-se</a></p>
+                        <p style={{ marginTop: '10px' }}><a href="#" onClick={(e) => { e.preventDefault(); navigate('/esqueci-senha'); }}>Esqueceu a senha?</a></p>
                     </div>
                 </form>
             </main>
