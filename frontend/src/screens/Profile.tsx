@@ -1,10 +1,11 @@
-import { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { CurrentUser, CategoryBudgets, DEFAULT_BUDGETS, Screen } from "../App";
 import { personalInfoSchema, PersonalInfoFormValues, budgetsSchema, BudgetsFormValues } from "../schemas/profile";
 import { updateUser, ApiError } from "../lib/api";
+import { PAYMENTS } from "../constants/payments";
+import { Field } from "../components/Field";
 
 interface Props {
   user: CurrentUser;
@@ -13,7 +14,6 @@ interface Props {
   navigate: (s: Screen) => void;
 }
 
-const PAYMENTS = ["Cartão de crédito", "Débito automático", "Pix", "Boleto"];
 const CATEGORIES: (keyof CategoryBudgets)[] = ["Streaming", "Trabalho", "Fitness", "Música", "Jogos", "Outros"];
 
 // Estilo base compartilhado pelos campos de texto/seleção desta tela.
@@ -193,12 +193,3 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
   );
 }
 
-function Field({ label, children, error }: { label: string; children: ReactNode; error?: string }) {
-  return (
-    <div>
-      <label className="block text-xs text-muted-foreground font-body mb-1.5">{label}</label>
-      {children}
-      {error && <p className="text-red-500 text-xs font-body mt-1">{error}</p>}
-    </div>
-  );
-}

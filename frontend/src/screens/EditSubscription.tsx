@@ -1,4 +1,3 @@
-import { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -6,13 +5,13 @@ import { Subscription, Screen, getStoredUser } from "../App";
 import { subscriptionSchema, SubscriptionFormValues, CATEGORY_VALUES, PERIOD_VALUES } from "../schemas/subscription";
 import { updateSub, ApiError } from "../lib/api";
 import { subsQueryKey } from "../lib/queryClient";
+import { PAYMENTS } from "../constants/payments";
+import { Field } from "../components/Field";
 
 interface Props {
   sub: Subscription;
   navigate: (s: Screen, id?: string | number) => void;
 }
-
-const PAYMENTS = ["Cartão de crédito", "Débito automático", "Pix", "Boleto"];
 
 export default function EditSubscription({ sub, navigate }: Props) {
   const queryClient = useQueryClient();
@@ -177,12 +176,3 @@ export default function EditSubscription({ sub, navigate }: Props) {
   );
 }
 
-function Field({ label, children, error }: { label: string; children: ReactNode; error?: string }) {
-  return (
-    <div>
-      <label className="block text-[13px] text-muted-foreground font-body mb-2">{label}</label>
-      {children}
-      {error && <p className="text-red-500 text-xs font-body mt-1">{error}</p>}
-    </div>
-  );
-}

@@ -1,4 +1,4 @@
-import { useState, ReactNode } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -6,26 +6,15 @@ import { Screen, Subscription, getStoredUser } from "../App";
 import { subscriptionSchema, SubscriptionFormValues, CATEGORY_VALUES, PERIOD_VALUES } from "../schemas/subscription";
 import { createSub, ApiError } from "../lib/api";
 import { subsQueryKey } from "../lib/queryClient";
+import { SERVICES, ServiceCatalogEntry } from "../constants/catalog";
+import { PAYMENTS } from "../constants/payments";
+import { Field } from "../components/Field";
 
 interface Props {
   navigate: (s: Screen) => void;
 }
 
-const SERVICES = [
-  { name: "Netflix", icon: "🎬", color: "#e50914", category: "Streaming" },
-  { name: "Spotify", icon: "🎵", color: "#1db954", category: "Música" },
-  { name: "Disney+", icon: "✨", color: "#0063e5", category: "Streaming" },
-  { name: "HBO Max", icon: "📺", color: "#5822a4", category: "Streaming" },
-  { name: "Adobe Creative", icon: "🎨", color: "#ff0000", category: "Trabalho" },
-  { name: "GitHub Pro", icon: "💻", color: "#6e5494", category: "Trabalho" },
-  { name: "Academia", icon: "💪", color: "#f59e0b", category: "Fitness" },
-  { name: "PlayStation+", icon: "🎮", color: "#003087", category: "Jogos" },
-  { name: "Outro", icon: "📦", color: "#64748b", category: "Outros" },
-] as const;
-
-const PAYMENTS = ["Cartão de crédito", "Débito automático", "Pix", "Boleto"];
-
-type Service = (typeof SERVICES)[number];
+type Service = ServiceCatalogEntry;
 
 export default function AddSubscription({ navigate }: Props) {
   const [step, setStep] = useState<"service" | "details">("service");
@@ -255,12 +244,3 @@ export default function AddSubscription({ navigate }: Props) {
   );
 }
 
-function Field({ label, children, error }: { label: string; children: ReactNode; error?: string }) {
-  return (
-    <div>
-      <label className="block text-[13px] text-muted-foreground font-body mb-2">{label}</label>
-      {children}
-      {error && <p className="text-red-500 text-xs font-body mt-1">{error}</p>}
-    </div>
-  );
-}

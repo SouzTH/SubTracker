@@ -2,17 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Subscription, Screen, getStoredUser } from "../App";
 import { updateSub, deleteSub } from "../lib/api";
 import { subsQueryKey } from "../lib/queryClient";
-
-const CANCEL_URLS: Record<string, string> = {
-  Netflix: "https://www.netflix.com/cancelplan",
-  Spotify: "https://www.spotify.com/br/account/subscription/cancel",
-  "Disney+": "https://www.disneyplus.com/pt-br/account",
-  "HBO Max": "https://www.max.com/pt-br/account",
-  "Adobe Creative": "https://account.adobe.com/plans",
-  "GitHub Pro": "https://github.com/settings/billing",
-  "Academia": "https://www.smartfit.com.br/cancelamento",
-  "PlayStation+": "https://www.playstation.com/pt-br/support/subscriptions/cancel-ps-plus/",
-};
+import { CANCEL_URLS } from "../constants/catalog";
 
 interface Props {
   sub: Subscription;
