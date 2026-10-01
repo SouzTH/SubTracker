@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react"
 import { Subscription, Screen } from "../App"
 
 interface Props {
   subs: Subscription[]
   navigate: (screen: Screen, id?: string | number) => void;
   budgets: Record<string, number>
+  userName: string
 }
 
 function formatDate(iso: string) {
@@ -37,11 +37,7 @@ const CATEGORY_COLOR: Record<string, string> = {
   Outros: "#64748b",
 }
 
-export default function Dashboard({ subs, navigate, budgets }: Props) {
-  
-  // LÓGICA DINÂMICA INSERIDA AQUI:
-  const userStorage = localStorage.getItem('subtracker_user');
-  const currentUser = userStorage ? JSON.parse(userStorage) : { nome: 'Usuário' };
+export default function Dashboard({ subs, navigate, budgets, userName }: Props) {
 
   const currentMonthName = new Date().toLocaleString('pt-BR', { month: 'long' });
   const currentYear = new Date().getFullYear();
@@ -63,77 +59,31 @@ export default function Dashboard({ subs, navigate, budgets }: Props) {
   const usedCategories = Object.entries(byCategory).sort((a, b) => b[1] - a[1])
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
+    <div className="flex-1 overflow-y-auto pb-2">
       {/* Header */}
-      <div style={{ padding: "56px 24px 0" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "8px",
-          }}
-        >
+      <div className="pt-14 px-6">
+        <div className="flex justify-between items-center mb-2">
           <div>
-            <p
-              style={{
-                fontSize: "18px",
-                color: "var(--muted-foreground)",
-                fontFamily: "Inter, sans-serif",
-                marginBottom: "2px",
-                fontWeight: "bold",
-              }}
-            >
-              Olá, {currentUser.nome}!
+            <p className="text-lg text-muted-foreground font-body mb-0.5 font-bold">
+              Olá, {userName}!
             </p>
-            <p
-              style={{
-                fontSize: "13px",
-                color: "var(--muted-foreground)",
-                fontFamily: "Inter, sans-serif",
-              }}
-            >
+            <p className="text-[13px] text-muted-foreground font-body">
               {formattedDateString}
             </p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div className="flex items-center gap-2.5">
             {/* Importar Extrato button */}
             <button
               onClick={() => navigate("import")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "5px",
-                background: "rgba(0,212,170,0.1)",
-                border: "1px solid rgba(0,212,170,0.25)",
-                borderRadius: "10px",
-                padding: "7px 11px",
-                cursor: "pointer",
-                color: "var(--primary)",
-                fontFamily: "Inter, sans-serif",
-                fontWeight: 500,
-                fontSize: "12px",
-                whiteSpace: "nowrap",
-              }}
+              className="flex items-center gap-[5px] bg-primary/10 border border-primary/25 rounded-[10px] py-[7px] px-[11px] cursor-pointer text-primary font-body font-medium text-xs whitespace-nowrap"
             >
-              <span style={{ fontSize: "14px" }}>⬆</span>
+              <span className="text-sm">⬆</span>
               Importar Extrato
             </button>
             <div
               onClick={() => navigate("profile")}
               title="Meu perfil"
-              style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "50%",
-                background: "linear-gradient(135deg, var(--primary), #0099aa)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "18px",
-                flexShrink: 0,
-                cursor: "pointer",
-              }}
+              className="size-10 rounded-full bg-[linear-gradient(135deg,var(--primary),#0099aa)] flex items-center justify-center text-lg shrink-0 cursor-pointer"
             >
               👤
             </div>
@@ -142,52 +92,16 @@ export default function Dashboard({ subs, navigate, budgets }: Props) {
       </div>
 
       {/* Total Card */}
-      <div style={{ padding: "20px 24px 0" }}>
-        <div
-          style={{
-            background: "linear-gradient(135deg, #00d4aa18 0%, #0063e518 100%)",
-            border: "1px solid rgba(0,212,170,0.2)",
-            borderRadius: "24px",
-            padding: "28px 24px",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: "-40px",
-              right: "-40px",
-              width: "160px",
-              height: "160px",
-              borderRadius: "50%",
-              background:
-                "radial-gradient(circle, rgba(0,212,170,0.12) 0%, transparent 70%)",
-            }}
-          />
-          <p
-            style={{
-              fontSize: "13px",
-              color: "var(--muted-foreground)",
-              fontFamily: "Inter, sans-serif",
-              marginBottom: "8px",
-            }}
-          >
+      <div className="pt-5 px-6">
+        <div className="bg-[linear-gradient(135deg,#00d4aa18_0%,#0063e518_100%)] border border-primary/20 rounded-xl py-7 px-6 relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 size-40 rounded-full bg-[radial-gradient(circle,rgba(0,212,170,0.12)_0%,transparent_70%)]" />
+          <p className="text-[13px] text-muted-foreground font-body mb-2">
             Total gasto no mês
           </p>
-          <p
-            style={{
-              fontSize: "42px",
-              fontWeight: "800",
-              fontFamily: "Outfit, sans-serif",
-              color: "var(--primary)",
-              lineHeight: 1.1,
-              marginBottom: "16px",
-            }}
-          >
+          <p className="text-[42px] font-extrabold font-heading text-primary leading-[1.1] mb-4">
             {fmt(total)}
           </p>
-          <div style={{ display: "flex", gap: "16px" }}>
+          <div className="flex gap-4">
             <Stat label="Assinaturas" value={`${active.length} ativas`} />
             <Stat
               label="Pausadas"
@@ -202,21 +116,11 @@ export default function Dashboard({ subs, navigate, budgets }: Props) {
       </div>
 
       {/* Category progress bars */}
-      <div style={{ padding: "20px 24px 0" }}>
-        <p
-          style={{
-            fontSize: "13px",
-            fontWeight: 600,
-            fontFamily: "Outfit, sans-serif",
-            color: "var(--muted-foreground)",
-            marginBottom: "10px",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-          }}
-        >
+      <div className="pt-5 px-6">
+        <p className="text-[13px] font-semibold font-heading text-muted-foreground mb-2.5 uppercase tracking-[0.06em]">
           Metas por categoria
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <div className="flex flex-col gap-2.5">
           {usedCategories.map(([cat, spent]) => {
             const limit = budgets[cat] ?? 100
             const pct = Math.min((spent / limit) * 100, 100)
@@ -225,89 +129,35 @@ export default function Dashboard({ subs, navigate, budgets }: Props) {
             return (
               <div
                 key={cat}
-                style={{
-                  background: "var(--card)",
-                  border: `1px solid ${over ? "rgba(239,68,68,0.25)" : "var(--border)"}`,
-                  borderRadius: "14px",
-                  padding: "12px 14px",
-                }}
+                className={`bg-card border rounded-[14px] py-3 px-[14px] ${over ? "border-red-500/25" : "border-border"}`}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-                    <div
-                      style={{
-                        width: "8px",
-                        height: "8px",
-                        borderRadius: "50%",
-                        background: color,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: "13px",
-                        fontFamily: "Inter, sans-serif",
-                        color: "var(--foreground)",
-                        fontWeight: 500,
-                      }}
-                    >
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-[7px]">
+                    <div className="size-2 rounded-full shrink-0" style={{ background: color }} />
+                    <span className="text-[13px] font-body text-foreground font-medium">
                       {cat}
                     </span>
                     {over && (
-                      <span
-                        style={{
-                          fontSize: "10px",
-                          padding: "1px 6px",
-                          borderRadius: "8px",
-                          background: "rgba(239,68,68,0.15)",
-                          color: "#ef4444",
-                          fontFamily: "Inter, sans-serif",
-                        }}
-                      >
+                      <span className="text-[10px] py-px px-1.5 rounded-[8px] bg-red-500/15 text-red-500 font-body">
                         Limite
                       </span>
                     )}
                   </div>
-                  <span
-                    style={{
-                      fontSize: "12px",
-                      fontFamily: "Outfit, sans-serif",
-                      fontWeight: 600,
-                      color: over ? "#ef4444" : "var(--muted-foreground)",
-                    }}
-                  >
+                  <span className={`text-xs font-heading font-semibold ${over ? "text-red-500" : "text-muted-foreground"}`}>
                     {fmt(spent)}{" "}
-                    <span
-                      style={{ color: "var(--muted-foreground)", fontWeight: 400 }}
-                    >
+                    <span className="text-muted-foreground font-normal">
                       / {fmt(limit)}
                     </span>
                   </span>
                 </div>
-                <div
-                  style={{
-                    height: "5px",
-                    background: "var(--border)",
-                    borderRadius: "4px",
-                    overflow: "hidden",
-                  }}
-                >
+                <div className="h-[5px] bg-border rounded-[4px] overflow-hidden">
                   <div
+                    className="h-full rounded-[4px] transition-[width] duration-[600ms] ease-in-out"
                     style={{
-                      height: "100%",
-                      borderRadius: "4px",
                       width: `${pct}%`,
                       background: over
                         ? "linear-gradient(90deg, #ef4444, #f87171)"
                         : `linear-gradient(90deg, ${color}, ${color}aa)`,
-                      transition: "width 0.6s ease",
                     }}
                   />
                 </div>
@@ -318,18 +168,11 @@ export default function Dashboard({ subs, navigate, budgets }: Props) {
       </div>
 
       {/* Subscriptions list */}
-      <div style={{ padding: "20px 24px 0" }}>
-        <p
-          style={{
-            fontSize: "16px",
-            fontWeight: "600",
-            fontFamily: "Outfit, sans-serif",
-            marginBottom: "12px",
-          }}
-        >
+      <div className="pt-5 px-6">
+        <p className="text-base font-semibold font-heading mb-3">
           Próximas cobranças
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <div className="flex flex-col gap-2.5">
           {sorted.map((sub) => {
             const days = daysUntil(sub.nextCharge)
             const urgent = days <= 3
@@ -337,107 +180,35 @@ export default function Dashboard({ subs, navigate, budgets }: Props) {
               <button
                 key={sub.id}
                 onClick={() => navigate("details", sub.id)}
-                style={{
-                  background: "var(--card)",
-                  border: `1px solid ${
-                    urgent && sub.status === "Ativa"
-                      ? "rgba(245,158,11,0.3)"
-                      : "var(--border)"
-                  }`,
-                  borderRadius: "16px",
-                  padding: "16px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "14px",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  width: "100%",
-                  transition: "border-color 0.2s, transform 0.1s",
-                }}
+                className={`bg-card border rounded-md p-4 flex items-center gap-[14px] cursor-pointer text-left w-full transition-all duration-200 ${
+                  urgent && sub.status === "Ativa" ? "border-amber-500/30" : "border-border"
+                }`}
               >
                 <div
-                  style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "14px",
-                    background: `${sub.color}22`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "22px",
-                    flexShrink: 0,
-                    border: `1px solid ${sub.color}33`,
-                  }}
+                  className="size-12 rounded-[14px] flex items-center justify-center text-[22px] shrink-0 border"
+                  style={{ background: `${sub.color}22`, borderColor: `${sub.color}33` }}
                 >
                   {sub.icon}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      marginBottom: "4px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: "Outfit, sans-serif",
-                        fontWeight: 600,
-                        fontSize: "15px",
-                      }}
-                    >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-heading font-semibold text-[15px]">
                       {sub.name}
                     </span>
                     {sub.status === "Pausada" && (
-                      <span
-                        style={{
-                          fontSize: "10px",
-                          padding: "2px 7px",
-                          borderRadius: "10px",
-                          background: "rgba(100,116,139,0.2)",
-                          color: "var(--muted-foreground)",
-                          fontFamily: "Inter, sans-serif",
-                        }}
-                      >
+                      <span className="text-[10px] py-0.5 px-[7px] rounded-[10px] bg-slate-500/20 text-muted-foreground font-body">
                         Pausada
                       </span>
                     )}
                   </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--muted-foreground)",
-                        fontFamily: "Inter, sans-serif",
-                      }}
-                    >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground font-body">
                       {sub.category}
                     </span>
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--muted-foreground)",
-                      }}
-                    >
+                    <span className="text-xs text-muted-foreground">
                       ·
                     </span>
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        color:
-                          urgent && sub.status === "Ativa"
-                            ? "#f59e0b"
-                            : "var(--muted-foreground)",
-                        fontFamily: "Inter, sans-serif",
-                      }}
-                    >
+                    <span className={`text-xs font-body ${urgent && sub.status === "Ativa" ? "text-amber-500" : "text-muted-foreground"}`}>
                       {sub.status === "Ativa"
                         ? days === 0
                           ? "Hoje"
@@ -448,24 +219,11 @@ export default function Dashboard({ subs, navigate, budgets }: Props) {
                     </span>
                   </div>
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <p
-                    style={{
-                      fontFamily: "Outfit, sans-serif",
-                      fontWeight: 700,
-                      fontSize: "16px",
-                      marginBottom: "4px",
-                    }}
-                  >
+                <div className="text-right shrink-0">
+                  <p className="font-heading font-bold text-base mb-1">
                     {fmt(sub.value)}
                   </p>
-                  <p
-                    style={{
-                      fontSize: "11px",
-                      color: "var(--muted-foreground)",
-                      fontFamily: "Inter, sans-serif",
-                    }}
-                  >
+                  <p className="text-[11px] text-muted-foreground font-body">
                     {sub.period.toLowerCase()}
                   </p>
                 </div>
@@ -481,24 +239,10 @@ export default function Dashboard({ subs, navigate, budgets }: Props) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p
-        style={{
-          fontSize: "10px",
-          color: "var(--muted-foreground)",
-          fontFamily: "Inter, sans-serif",
-          marginBottom: "2px",
-        }}
-      >
+      <p className="text-[10px] text-muted-foreground font-body mb-0.5">
         {label}
       </p>
-      <p
-        style={{
-          fontSize: "14px",
-          fontWeight: "600",
-          fontFamily: "Outfit, sans-serif",
-          color: "var(--foreground)",
-        }}
-      >
+      <p className="text-sm font-semibold font-heading text-foreground">
         {value}
       </p>
     </div>

@@ -1,10 +1,12 @@
 import { useState, useRef } from "react";
-import { Screen, Subscription } from "../App";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Screen, Subscription, getStoredUser } from "../App";
+import { createSub, updateSub, ApiError } from "../lib/api";
+import { subsQueryKey } from "../lib/queryClient";
 
 interface Props {
   navigate: (s: Screen) => void;
   subs: Subscription[];
-  setSubs: (s: Subscription[]) => void;
 }
 
 interface DetectedSub {
@@ -48,17 +50,15 @@ function fmt(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default function ImportStatement({ navigate, subs, setSubs }: Props) {
+export default function ImportStatement({ navigate, subs }: Props) {
   const [stage, setStage] = useState<"upload" | "review">("upload");
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [detected, setDetected] = useState<DetectedSub[]>([]);
   const [confirmed, setConfirmed] = useState<Set<number>>(new Set());
-  const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [summary, setSummary] = useState<{ novas: number; confirmadas: number } | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+  const user = getStoredUser();
 
   // MOTOR REAL DE LEITURA DO CSV
   const processCSVText = (text: string) => {
@@ -110,7 +110,7 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
 
   const handleFile = (file: File) => {
     setFileName(file.name);
-    setError(null);
+    saveMutation.reset();
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -130,21 +130,10 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
     });
   };
 
-  const handleSave = async () => {
-    const userStorage = localStorage.getItem('subtracker_user');
-    if (!userStorage) {
-        alert("Sessão expirada. Faça login novamente.");
-        window.location.href = "/";
-        return;
-    }
-    const currentUser = JSON.parse(userStorage);
-    const toProcess = detected.filter((d) => confirmed.has(d.id));
+  const saveMutation = useMutation({
+    mutationFn: async (toProcess: DetectedSub[]) => {
+      if (!user) throw new ApiError("Sessão expirada. Faça login novamente.");
 
-    setSaving(true);
-    setError(null);
-
-    try {
-      const nextSubs = [...subs];
       let novas = 0;
       let confirmadas = 0;
 
@@ -153,91 +142,79 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
           // Já existe: confirma o pagamento do ciclo atual em vez de duplicar.
           const updatedHistory = [...d.existing.history, { date: d.detectedDateISO, value: d.value, status: "Pago" as const }];
           const updatedNextCharge = addCycle(d.detectedDateISO, d.existing.period);
-          const response = await fetch(`http://localhost:3000/subs/${d.existing.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ history: updatedHistory, nextCharge: updatedNextCharge }),
-          });
-          if (!response.ok) throw new Error(`Falha ao confirmar pagamento de ${d.name}`);
-          const updated = await response.json();
-          const idx = nextSubs.findIndex((s) => s.id === d.existing!.id);
-          if (idx >= 0) nextSubs[idx] = updated;
+          await updateSub(d.existing.id, { history: updatedHistory, nextCharge: updatedNextCharge });
           confirmadas++;
         } else {
           // Novo: cria a assinatura com as datas reais detectadas no extrato.
-          const newSub = {
-            userId: currentUser.id,
+          await createSub({
+            userId: user.id,
             name: d.name,
             icon: d.icon,
             color: d.color,
             category: d.category,
             value: d.value,
-            period: "Mensal" as const,
+            period: "Mensal",
             nextCharge: addCycle(d.detectedDateISO, "Mensal"),
             paymentMethod: "Cartão de crédito",
-            status: "Ativa" as const,
-            history: [{ date: d.detectedDateISO, value: d.value, status: "Pago" as const }],
-          };
-          const response = await fetch("http://localhost:3000/subs", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(newSub),
+            status: "Ativa",
+            history: [{ date: d.detectedDateISO, value: d.value, status: "Pago" }],
           });
-          if (!response.ok) throw new Error(`Falha ao criar ${d.name}`);
-          const created = await response.json();
-          nextSubs.push(created);
           novas++;
         }
       }
 
-      setSubs(nextSubs);
-      setSummary({ novas, confirmadas });
-      setSaved(true);
+      return { novas, confirmadas };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: subsQueryKey(user?.id) });
       setTimeout(() => navigate("dashboard"), 1600);
-    } catch (error) {
-      console.error("Erro ao processar extrato importado:", error);
-      setError("Não foi possível salvar no servidor. Verifique se o json-server está rodando (npm run server) e tente novamente.");
-    } finally {
-      setSaving(false);
-    }
+    },
+  });
+
+  const handleSave = () => {
+    const toProcess = detected.filter((d) => confirmed.has(d.id));
+    saveMutation.mutate(toProcess);
   };
 
+  const saved = saveMutation.isSuccess;
+  const saving = saveMutation.isPending;
+  const summary = saveMutation.data ?? null;
+  const error = saveMutation.isError
+    ? saveMutation.error instanceof ApiError
+      ? saveMutation.error.message
+      : "Não foi possível salvar no servidor. Verifique se o json-server está rodando (npm run server) e tente novamente."
+    : null;
+
+  const canSubmit = confirmed.size > 0 && !saved && !saving;
+
   return (
-    <div style={{ flex: 1, overflowY: "auto" }}>
-      <div style={{ padding: "56px 24px 20px", display: "flex", alignItems: "center", gap: "14px" }}>
+    <div className="flex-1 overflow-y-auto">
+      <div className="pt-14 px-6 pb-5 flex items-center gap-[14px]">
         <button
           onClick={() => (stage === "review" ? setStage("upload") : navigate("dashboard"))}
-          style={{
-            width: "36px", height: "36px", borderRadius: "12px",
-            background: "var(--secondary)", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "18px", color: "var(--foreground)",
-          }}
+          className="w-9 h-9 rounded-sm bg-secondary border-none cursor-pointer flex items-center justify-center text-lg text-foreground"
         >
           ←
         </button>
         <div>
-          <h1 style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "22px", margin: 0 }}>
+          <h1 className="font-heading font-bold text-[22px]">
             Importar Extrato
           </h1>
-          <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0 }}>
+          <p className="text-xs text-muted-foreground font-body">
             {stage === "upload" ? "Envie seu arquivo CSV" : "Assinaturas detectadas"}
           </p>
         </div>
       </div>
 
-      <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ height: "3px", background: "var(--border)", borderRadius: "4px" }}>
-          <div style={{
-            height: "100%", borderRadius: "4px",
-            width: stage === "upload" ? "50%" : "100%",
-            background: "var(--primary)",
-            transition: "width 0.4s ease",
-          }} />
+      <div className="px-6 pb-6">
+        <div className="h-[3px] bg-border rounded-[4px]">
+          <div className={`h-full rounded-[4px] bg-primary transition-[width] duration-[400ms] ease-in-out ${
+            stage === "upload" ? "w-1/2" : "w-full"
+          }`} />
         </div>
       </div>
 
-      <div style={{ padding: "0 24px" }}>
+      <div className="px-6">
         {stage === "upload" && (
           <div
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -249,33 +226,18 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
               if (f) handleFile(f);
             }}
             onClick={() => fileRef.current?.click()}
-            style={{
-              border: `2px dashed ${dragging ? "var(--primary)" : "rgba(0,212,170,0.25)"}`,
-              borderRadius: "20px",
-              padding: "48px 24px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "12px",
-              cursor: "pointer",
-              background: dragging ? "rgba(0,212,170,0.05)" : "var(--card)",
-              transition: "all 0.2s",
-              marginBottom: "20px",
-            }}
+            className={`border-2 border-dashed rounded-lg py-12 px-6 flex flex-col items-center gap-3 cursor-pointer transition-colors duration-200 mb-5 ${
+              dragging ? "border-primary bg-primary/5" : "border-primary/25 bg-card"
+            }`}
           >
-            <div style={{
-              width: "64px", height: "64px", borderRadius: "20px",
-              background: "rgba(0,212,170,0.1)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "32px",
-            }}>
+            <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center text-[32px]">
               📄
             </div>
-            <div style={{ textAlign: "center" }}>
-              <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "16px", margin: "0 0 6px" }}>
+            <div className="text-center">
+              <p className="font-heading font-semibold text-base mb-1.5">
                 Arraste seu arquivo aqui
               </p>
-              <p style={{ fontSize: "13px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0 }}>
+              <p className="text-[13px] text-muted-foreground font-body">
                 ou clique para selecionar o arquivo .csv
               </p>
             </div>
@@ -283,7 +245,7 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
               ref={fileRef}
               type="file"
               accept=".csv"
-              style={{ display: "none" }}
+              className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) handleFile(f);
@@ -294,56 +256,37 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
 
         {stage === "review" && (
           <>
-            <div style={{
-              display: "flex", alignItems: "center", gap: "10px",
-              background: "rgba(0,212,170,0.08)", border: "1px solid rgba(0,212,170,0.2)",
-              borderRadius: "12px", padding: "10px 14px", marginBottom: "20px",
-            }}>
-              <span style={{ fontSize: "18px" }}>📄</span>
-              <span style={{ fontFamily: "Inter, sans-serif", fontSize: "13px", color: "var(--foreground)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div className="flex items-center gap-2.5 bg-primary/8 border border-primary/20 rounded-sm py-2.5 px-[14px] mb-5">
+              <span className="text-lg">📄</span>
+              <span className="font-body text-[13px] text-foreground flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                 {fileName}
               </span>
-              <span style={{
-                fontSize: "11px", padding: "3px 8px", borderRadius: "8px",
-                background: "rgba(0,212,170,0.15)", color: "var(--primary)",
-                fontFamily: "Inter, sans-serif", fontWeight: 500, flexShrink: 0,
-              }}>
+              <span className="text-[11px] py-[3px] px-2 rounded-[8px] bg-primary/15 text-primary font-body font-medium shrink-0">
                 Analisado
               </span>
             </div>
 
-            <p style={{ fontSize: "14px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", marginBottom: "14px" }}>
-              <strong style={{ color: "var(--foreground)" }}>{detected.length} assinaturas</strong> encontradas na sua fatura. Selecione as que deseja monitorar:
+            <p className="text-sm text-muted-foreground font-body mb-3.5">
+              <strong className="text-foreground">{detected.length} assinaturas</strong> encontradas na sua fatura. Selecione as que deseja monitorar:
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
+            <div className="flex flex-col gap-2.5 mb-6">
               {detected.map((d) => {
                 const isChecked = confirmed.has(d.id);
                 return (
                   <button
                     key={d.id}
                     onClick={() => toggle(d.id)}
+                    className="rounded-md py-4 px-4 flex items-center gap-[14px] cursor-pointer text-left w-full transition-colors duration-[180ms] border-[1.5px]"
                     style={{
                       background: isChecked ? `${d.color}0f` : "var(--card)",
-                      border: `1.5px solid ${isChecked ? d.color + "55" : "var(--border)"}`,
-                      borderRadius: "16px",
-                      padding: "16px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "14px",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      width: "100%",
-                      transition: "all 0.18s",
+                      borderColor: isChecked ? `${d.color}55` : "var(--border)",
                     }}
                   >
-                    <div style={{
-                      width: "22px", height: "22px", borderRadius: "8px",
-                      border: `2px solid ${isChecked ? d.color : "var(--border)"}`,
-                      background: isChecked ? d.color : "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0, transition: "all 0.15s",
-                    }}>
+                    <div
+                      className="w-[22px] h-[22px] rounded-[8px] border-2 flex items-center justify-center shrink-0 transition-colors duration-150"
+                      style={{ borderColor: isChecked ? d.color : "var(--border)", background: isChecked ? d.color : "transparent" }}
+                    >
                       {isChecked && (
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                           <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -351,37 +294,32 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
                       )}
                     </div>
 
-                    <div style={{
-                      width: "42px", height: "42px", borderRadius: "12px",
-                      background: `${d.color}22`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "20px", flexShrink: 0,
-                    }}>
+                    <div
+                      className="w-[42px] h-[42px] rounded-sm flex items-center justify-center text-xl shrink-0"
+                      style={{ background: `${d.color}22` }}
+                    >
                       {d.icon}
                     </div>
 
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "15px", margin: "0 0 3px" }}>
+                    <div className="flex-1">
+                      <p className="font-heading font-semibold text-[15px] mb-[3px]">
                         {d.name}
                       </p>
-                      <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0, display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                      <p className="text-xs text-muted-foreground font-body flex items-center gap-1.5 flex-wrap">
                         <span>Detectado em {d.detectedDate} · {d.category}</span>
-                        <span style={{
-                          fontSize: "10px", padding: "1px 7px", borderRadius: "8px",
-                          background: d.existing ? "rgba(0,212,170,0.15)" : "rgba(148,163,184,0.15)",
-                          color: d.existing ? "var(--primary)" : "var(--muted-foreground)",
-                          fontWeight: 600,
-                        }}>
+                        <span className={`text-[10px] py-px px-[7px] rounded-[8px] font-semibold ${
+                          d.existing ? "bg-primary/15 text-primary" : "bg-slate-400/15 text-muted-foreground"
+                        }`}>
                           {d.existing ? "confirma pagamento" : "nova assinatura"}
                         </span>
                       </p>
                     </div>
 
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "16px", margin: 0, color: isChecked ? d.color : "var(--foreground)" }}>
+                    <div className="text-right shrink-0">
+                      <p className="font-heading font-bold text-base" style={{ color: isChecked ? d.color : "var(--foreground)" }}>
                         {fmt(d.value)}
                       </p>
-                      <p style={{ fontSize: "11px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0 }}>
+                      <p className="text-[11px] text-muted-foreground font-body">
                         / mês
                       </p>
                     </div>
@@ -391,15 +329,11 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
             </div>
 
             {confirmed.size > 0 && (
-              <div style={{
-                background: "rgba(0,212,170,0.06)", border: "1px solid rgba(0,212,170,0.2)",
-                borderRadius: "14px", padding: "14px 16px", marginBottom: "16px",
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-              }}>
-                <span style={{ fontFamily: "Inter, sans-serif", fontSize: "13px", color: "var(--muted-foreground)" }}>
+              <div className="bg-primary/6 border border-primary/20 rounded-[14px] py-[14px] px-4 mb-4 flex justify-between items-center">
+                <span className="font-body text-[13px] text-muted-foreground">
                   {confirmed.size} selecionada{confirmed.size > 1 ? "s" : ""}
                 </span>
-                <span style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "15px", color: "var(--primary)" }}>
+                <span className="font-heading font-bold text-[15px] text-primary">
                   +{fmt([...confirmed].reduce((acc, id) => {
                     const d = detected.find((x) => x.id === id);
                     return acc + (d?.value ?? 0);
@@ -409,29 +343,17 @@ export default function ImportStatement({ navigate, subs, setSubs }: Props) {
             )}
 
             {error && (
-              <div style={{
-                background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
-                borderRadius: "12px", padding: "12px 14px", marginBottom: "16px",
-                color: "#ef4444", fontFamily: "Inter, sans-serif", fontSize: "13px",
-              }}>
+              <div className="bg-red-500/8 border border-red-500/25 rounded-sm py-3 px-[14px] mb-4 text-red-500 font-body text-[13px]">
                 {error}
               </div>
             )}
 
             <button
               onClick={handleSave}
-              disabled={confirmed.size === 0 || saved || saving}
-              style={{
-                width: "100%", padding: "16px",
-                borderRadius: "16px", border: "none",
-                background: confirmed.size > 0 && !saved && !saving ? "var(--primary)" : "var(--muted)",
-                color: confirmed.size > 0 && !saved && !saving ? "var(--primary-foreground)" : "var(--muted-foreground)",
-                fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "16px",
-                cursor: confirmed.size > 0 && !saved && !saving ? "pointer" : "not-allowed",
-                transition: "all 0.15s",
-                marginBottom: "24px",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-              }}
+              disabled={!canSubmit}
+              className={`w-full p-4 rounded-md border-none font-heading font-bold text-base transition-colors mb-6 flex items-center justify-center gap-2 ${
+                canSubmit ? "bg-primary text-primary-foreground cursor-pointer" : "bg-muted text-muted-foreground cursor-not-allowed"
+              }`}
             >
               {saved
                 ? `✓ ${summary ? [

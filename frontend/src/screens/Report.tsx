@@ -44,6 +44,10 @@ export default function Report({ subs, navigate }: Props) {
     .sort((a, b) => b.monthly - a.monthly)
     .slice(0, 3);
 
+  // Mês/ano atuais (em vez de um texto fixo)
+  const currentMonthName = new Date().toLocaleString("pt-BR", { month: "long" });
+  const currentPeriodLabel = `${currentMonthName.charAt(0).toUpperCase() + currentMonthName.slice(1)} ${new Date().getFullYear()}`;
+
   // Simple donut chart as SVG
   const size = 160;
   const cx = size / 2;
@@ -71,34 +75,31 @@ export default function Report({ subs, navigate }: Props) {
   }
 
   return (
-    <div style={{ flex: 1, overflowY: "auto" }}>
+    <div className="flex-1 overflow-y-auto">
       {/* Header */}
-      <div style={{ padding: "56px 24px 24px" }}>
-        <h1 style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "26px", marginBottom: "4px" }}>
+      <div className="pt-14 px-6 pb-6">
+        <h1 className="font-heading font-bold text-[26px] mb-1">
           Relatório
         </h1>
-        <p style={{ fontSize: "13px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif" }}>
-          Setembro 2026
+        <p className="text-[13px] text-muted-foreground font-body">
+          {currentPeriodLabel}
         </p>
       </div>
 
-      <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div className="px-6 flex flex-col gap-4">
         {/* KPI row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <div className="grid grid-cols-2 gap-3">
           <KpiCard label="Total mensal" value={fmt(monthly)} sub={`${active.length} assinaturas`} accent />
           <KpiCard label="Projeção anual" value={fmt(annual)} sub="estimativa" />
         </div>
 
         {/* Donut chart */}
-        <div style={{
-          background: "var(--card)", borderRadius: "20px", padding: "24px",
-          border: "1px solid var(--border)",
-        }}>
-          <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "16px", marginBottom: "20px" }}>
+        <div className="bg-card rounded-lg p-6 border border-border">
+          <p className="font-heading font-semibold text-base mb-5">
             Gastos por categoria
           </p>
-          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-            <svg width={size} height={size} style={{ flexShrink: 0 }}>
+          <div className="flex items-center gap-5">
+            <svg width={size} height={size} className="shrink-0">
               {arcs.map(({ cat, start, end }, i) => (
                 <path
                   key={i}
@@ -113,33 +114,38 @@ export default function Report({ subs, navigate }: Props) {
               <text
                 x={cx} y={cy - 6}
                 textAnchor="middle"
-                style={{ fill: "var(--foreground)", fontFamily: "Outfit, sans-serif", fontWeight: "800", fontSize: "15px" }}
+                fill="var(--foreground)"
+                className="font-heading font-extrabold text-[15px]"
               >
-                {fmt(monthly).replace("R$ ", "R$ ")}
+                {fmt(monthly).replace("R$ ", "R$ ")}
               </text>
               <text
                 x={cx} y={cy + 12}
                 textAnchor="middle"
-                style={{ fill: "#64748b", fontFamily: "Inter, sans-serif", fontSize: "10px" }}
+                fill="#64748b"
+                className="font-body text-[10px]"
               >
                 por mês
               </text>
             </svg>
 
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div className="flex-1 flex flex-col gap-2.5">
               {sorted.map(([cat, val]) => (
                 <div key={cat}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: CATEGORY_COLOR[cat] ?? "#64748b", flexShrink: 0 }} />
-                      <span style={{ fontSize: "12px", fontFamily: "Inter, sans-serif", color: "var(--foreground)" }}>{cat}</span>
+                  <div className="flex justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <div className="size-2 rounded-full shrink-0" style={{ background: CATEGORY_COLOR[cat] ?? "#64748b" }} />
+                      <span className="text-xs font-body text-foreground">{cat}</span>
                     </div>
-                    <span style={{ fontSize: "12px", fontFamily: "Outfit, sans-serif", fontWeight: 600, color: "var(--foreground)" }}>
+                    <span className="text-xs font-heading font-semibold text-foreground">
                       {((val / monthly) * 100).toFixed(0)}%
                     </span>
                   </div>
-                  <div style={{ height: "3px", background: "var(--border)", borderRadius: "4px" }}>
-                    <div style={{ height: "100%", borderRadius: "4px", background: CATEGORY_COLOR[cat] ?? "#64748b", width: `${(val / maxCat) * 100}%`, transition: "width 0.6s ease" }} />
+                  <div className="h-[3px] bg-border rounded-[4px]">
+                    <div
+                      className="h-full rounded-[4px] transition-[width] duration-[600ms] ease-in-out"
+                      style={{ background: CATEGORY_COLOR[cat] ?? "#64748b", width: `${(val / maxCat) * 100}%` }}
+                    />
                   </div>
                 </div>
               ))}
@@ -149,52 +155,42 @@ export default function Report({ subs, navigate }: Props) {
 
         {/* Top subs */}
         <div>
-          <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "16px", marginBottom: "12px" }}>
+          <p className="font-heading font-semibold text-base mb-3">
             Maiores gastos
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div className="flex flex-col gap-2.5">
             {topSubs.map((s, i) => (
               <button
                 key={s.id}
                 onClick={() => navigate("details", s.id)}
-                style={{
-                  background: "var(--card)", border: "1px solid var(--border)",
-                  borderRadius: "16px", padding: "16px",
-                  display: "flex", alignItems: "center", gap: "14px",
-                  cursor: "pointer", textAlign: "left", width: "100%",
-                }}
+                className="bg-card border border-border rounded-md p-4 flex items-center gap-[14px] cursor-pointer text-left w-full"
               >
-                <div style={{
-                  width: "32px", height: "32px", borderRadius: "10px",
-                  background: "var(--secondary)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "14px", fontFamily: "Outfit, sans-serif", fontWeight: 800,
-                  color: i === 0 ? "#f59e0b" : i === 1 ? "var(--muted-foreground)" : "var(--muted-foreground)",
-                  flexShrink: 0,
-                }}>
+                <div className={`w-8 h-8 rounded-[10px] bg-secondary flex items-center justify-center text-sm font-heading font-extrabold shrink-0 ${
+                  i === 0 ? "text-amber-500" : "text-muted-foreground"
+                }`}>
                   {i + 1}
                 </div>
-                <div style={{
-                  width: "40px", height: "40px", borderRadius: "12px",
-                  background: `${s.color}22`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "20px", flexShrink: 0,
-                }}>
+                <div
+                  className="w-10 h-10 rounded-sm flex items-center justify-center text-xl shrink-0"
+                  style={{ background: `${s.color}22` }}
+                >
                   {s.icon}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "15px", marginBottom: "3px" }}>{s.name}</p>
-                  <div style={{ height: "4px", background: "var(--border)", borderRadius: "4px", overflow: "hidden" }}>
-                    <div style={{
-                      height: "100%", borderRadius: "4px",
-                      background: `linear-gradient(90deg, ${s.color}, ${s.color}88)`,
-                      width: `${(s.monthly / topSubs[0].monthly) * 100}%`,
-                    }} />
+                <div className="flex-1">
+                  <p className="font-heading font-semibold text-[15px] mb-[3px]">{s.name}</p>
+                  <div className="h-1 bg-border rounded-[4px] overflow-hidden">
+                    <div
+                      className="h-full rounded-[4px]"
+                      style={{
+                        background: `linear-gradient(90deg, ${s.color}, ${s.color}88)`,
+                        width: `${(s.monthly / topSubs[0].monthly) * 100}%`,
+                      }}
+                    />
                   </div>
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "15px" }}>{fmt(s.monthly)}</p>
-                  <p style={{ fontSize: "11px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif" }}>/ mês</p>
+                <div className="text-right shrink-0">
+                  <p className="font-heading font-bold text-[15px]">{fmt(s.monthly)}</p>
+                  <p className="text-[11px] text-muted-foreground font-body">/ mês</p>
                 </div>
               </button>
             ))}
@@ -202,20 +198,17 @@ export default function Report({ subs, navigate }: Props) {
         </div>
 
         {/* Monthly breakdown */}
-        <div style={{
-          background: "var(--card)", borderRadius: "20px", padding: "20px",
-          border: "1px solid var(--border)", marginBottom: "8px",
-        }}>
-          <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "16px", marginBottom: "16px" }}>
+        <div className="bg-card rounded-lg p-5 border border-border mb-2">
+          <p className="font-heading font-semibold text-base mb-4">
             Resumo financeiro
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div className="flex flex-col gap-3">
             <Row label="Gasto este mês" value={fmt(monthly)} />
-            <div style={{ height: "1px", background: "var(--border)" }} />
+            <div className="h-px bg-border" />
             <Row label="Projeção próximo mês" value={fmt(monthly)} />
-            <div style={{ height: "1px", background: "var(--border)" }} />
+            <div className="h-px bg-border" />
             <Row label="Projeção anual" value={fmt(annual)} highlight />
-            <div style={{ height: "1px", background: "var(--border)" }} />
+            <div className="h-px bg-border" />
             <Row label="Assinaturas ativas" value={`${active.length}`} />
           </div>
         </div>
@@ -226,18 +219,14 @@ export default function Report({ subs, navigate }: Props) {
 
 function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: boolean }) {
   return (
-    <div style={{
-      background: accent ? "rgba(0,212,170,0.08)" : "var(--card)",
-      border: `1px solid ${accent ? "rgba(0,212,170,0.2)" : "var(--border)"}`,
-      borderRadius: "18px", padding: "18px",
-    }}>
-      <p style={{ fontSize: "11px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+    <div className={`rounded-[18px] p-[18px] border ${accent ? "bg-primary/8 border-primary/20" : "bg-card border-border"}`}>
+      <p className="text-[11px] text-muted-foreground font-body mb-2 uppercase tracking-[0.04em]">
         {label}
       </p>
-      <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 800, fontSize: "22px", color: accent ? "var(--primary)" : "var(--foreground)", marginBottom: "4px", lineHeight: 1 }}>
+      <p className={`font-heading font-extrabold text-[22px] mb-1 leading-none ${accent ? "text-primary" : "text-foreground"}`}>
         {value}
       </p>
-      <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif" }}>
+      <p className="text-xs text-muted-foreground font-body">
         {sub}
       </p>
     </div>
@@ -246,9 +235,9 @@ function KpiCard({ label, value, sub, accent }: { label: string; value: string; 
 
 function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ fontSize: "14px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif" }}>{label}</span>
-      <span style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "15px", color: highlight ? "var(--primary)" : "var(--foreground)" }}>
+    <div className="flex justify-between items-center">
+      <span className="text-sm text-muted-foreground font-body">{label}</span>
+      <span className={`font-heading font-bold text-[15px] ${highlight ? "text-primary" : "text-foreground"}`}>
         {value}
       </span>
     </div>

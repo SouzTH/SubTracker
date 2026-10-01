@@ -1,5 +1,10 @@
-import { useState } from "react";
+import { ReactNode } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import { CurrentUser, CategoryBudgets, DEFAULT_BUDGETS, Screen } from "../App";
+import { personalInfoSchema, PersonalInfoFormValues, budgetsSchema, BudgetsFormValues } from "../schemas/profile";
+import { updateUser, ApiError } from "../lib/api";
 
 interface Props {
   user: CurrentUser;
@@ -11,112 +16,72 @@ interface Props {
 const PAYMENTS = ["Cartão de crédito", "Débito automático", "Pix", "Boleto"];
 const CATEGORIES: (keyof CategoryBudgets)[] = ["Streaming", "Trabalho", "Fitness", "Música", "Jogos", "Outros"];
 
+// Estilo base compartilhado pelos campos de texto/seleção desta tela.
+const baseInputClass =
+  "w-full box-border bg-background border border-border rounded-sm py-3 font-body text-sm text-foreground outline-none";
+
+function saveButtonClass(busy: boolean) {
+  return `w-full py-[13px] rounded-sm border-none font-heading font-bold text-sm mt-1 ${
+    busy ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-primary text-primary-foreground cursor-pointer"
+  }`;
+}
+
 export default function Profile({ user, onUserUpdate, onLogout, navigate }: Props) {
-  const [nome, setNome] = useState(user.nome);
-  const [telefone, setTelefone] = useState(user.telefone ?? "");
-  const [paymentMethod, setPaymentMethod] = useState(user.paymentMethod ?? PAYMENTS[0]);
-  const [budgets, setBudgets] = useState<CategoryBudgets>(user.budgets ?? DEFAULT_BUDGETS);
+  const infoForm = useForm<PersonalInfoFormValues>({
+    resolver: zodResolver(personalInfoSchema),
+    defaultValues: {
+      nome: user.nome,
+      telefone: user.telefone ?? "",
+      paymentMethod: user.paymentMethod ?? PAYMENTS[0],
+    },
+  });
 
-  const [savingInfo, setSavingInfo] = useState(false);
-  const [savedInfo, setSavedInfo] = useState(false);
-  const [savingBudgets, setSavingBudgets] = useState(false);
-  const [savedBudgets, setSavedBudgets] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const budgetsForm = useForm<BudgetsFormValues>({
+    resolver: zodResolver(budgetsSchema),
+    defaultValues: user.budgets ?? DEFAULT_BUDGETS,
+  });
 
-  const saveInfo = async () => {
-    setSavingInfo(true);
-    setSavedInfo(false);
-    setError(null);
-    try {
-      const response = await fetch(`http://localhost:3000/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome, telefone, paymentMethod }),
-      });
-      if (!response.ok) throw new Error("Falha ao salvar");
-      onUserUpdate({ ...user, nome, telefone, paymentMethod });
-      setSavedInfo(true);
-      setTimeout(() => setSavedInfo(false), 2000);
-    } catch (e) {
-      console.error(e);
-      setError("Não foi possível salvar seus dados. Verifique se o json-server está rodando.");
-    } finally {
-      setSavingInfo(false);
-    }
-  };
+  const saveInfoMutation = useMutation({
+    mutationFn: (values: PersonalInfoFormValues) => updateUser(user.id, values),
+    onSuccess: (_data, values) => onUserUpdate({ ...user, ...values }),
+  });
 
-  const saveBudgets = async () => {
-    setSavingBudgets(true);
-    setSavedBudgets(false);
-    setError(null);
-    try {
-      const response = await fetch(`http://localhost:3000/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ budgets }),
-      });
-      if (!response.ok) throw new Error("Falha ao salvar");
-      onUserUpdate({ ...user, budgets });
-      setSavedBudgets(true);
-      setTimeout(() => setSavedBudgets(false), 2000);
-    } catch (e) {
-      console.error(e);
-      setError("Não foi possível salvar suas metas. Verifique se o json-server está rodando.");
-    } finally {
-      setSavingBudgets(false);
-    }
-  };
+  const saveBudgetsMutation = useMutation({
+    mutationFn: (values: BudgetsFormValues) => updateUser(user.id, { budgets: values }),
+    onSuccess: (_data, values) => onUserUpdate({ ...user, budgets: values }),
+  });
+
+  const errorMessage = (error: unknown, fallback: string) =>
+    error instanceof ApiError ? error.message : fallback;
 
   return (
-    <div style={{ flex: 1, overflowY: "auto" }}>
+    <div className="flex-1 overflow-y-auto">
       {/* Header */}
-      <div style={{ padding: "56px 24px 24px", display: "flex", alignItems: "center", gap: "14px" }}>
+      <div className="pt-14 px-6 pb-6 flex items-center gap-[14px]">
         <button
           onClick={() => navigate("dashboard")}
-          style={{
-            width: "36px", height: "36px", borderRadius: "12px",
-            background: "var(--secondary)", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "18px", color: "var(--foreground)",
-          }}
+          className="w-9 h-9 rounded-sm bg-secondary border-none cursor-pointer flex items-center justify-center text-lg text-foreground"
         >
           ←
         </button>
         <div>
-          <h1 style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "22px", margin: 0 }}>
-            Meu Perfil
-          </h1>
-          <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0 }}>
-            {user.email}
-          </p>
+          <h1 className="font-heading font-bold text-[22px]">Meu Perfil</h1>
+          <p className="text-xs text-muted-foreground font-body">{user.email}</p>
         </div>
       </div>
 
-      <div style={{ padding: "0 24px 32px", display: "flex", flexDirection: "column", gap: "24px" }}>
-        {error && (
-          <div style={{
-            background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
-            borderRadius: "12px", padding: "12px 14px",
-            color: "#ef4444", fontFamily: "Inter, sans-serif", fontSize: "13px",
-          }}>
-            {error}
-          </div>
-        )}
-
+      <div className="px-6 pb-8 flex flex-col gap-6">
         {/* Dados pessoais */}
-        <section style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "18px", padding: "20px" }}>
-          <h2 style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "16px", margin: "0 0 16px" }}>
-            Dados pessoais
-          </h2>
+        <section className="bg-card border border-border rounded-[18px] p-5">
+          <h2 className="font-heading font-bold text-base mb-4">Dados pessoais</h2>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            <Field label="Nome">
-              <input
-                type="text"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                style={inputStyle}
-              />
+          <form
+            onSubmit={infoForm.handleSubmit((values) => saveInfoMutation.mutate(values))}
+            noValidate
+            className="flex flex-col gap-[14px]"
+          >
+            <Field label="Nome" error={infoForm.formState.errors.nome?.message}>
+              <input type="text" className={`${baseInputClass} px-[14px]`} {...infoForm.register("nome")} />
             </Field>
 
             <Field label="Email">
@@ -125,83 +90,93 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
                 value={user.email}
                 disabled
                 title="O email não pode ser alterado por aqui."
-                style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }}
+                className={`${baseInputClass} px-[14px] opacity-60 cursor-not-allowed`}
               />
             </Field>
 
             <Field label="Telefone (opcional)">
               <input
                 type="tel"
-                value={telefone}
-                onChange={(e) => setTelefone(e.target.value)}
                 placeholder="(00) 00000-0000"
-                style={inputStyle}
+                className={`${baseInputClass} px-[14px]`}
+                {...infoForm.register("telefone")}
               />
             </Field>
 
-            <Field label="Forma de pagamento padrão">
+            <Field label="Forma de pagamento padrão" error={infoForm.formState.errors.paymentMethod?.message}>
               <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                style={{ ...inputStyle, appearance: "none", cursor: "pointer", colorScheme: "dark" }}
+                className={`${baseInputClass} px-[14px] appearance-none cursor-pointer [color-scheme:dark]`}
+                {...infoForm.register("paymentMethod")}
               >
-                {PAYMENTS.map((p) => <option key={p}>{p}</option>)}
+                {PAYMENTS.map((p) => (
+                  <option key={p}>{p}</option>
+                ))}
               </select>
             </Field>
 
-            <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0 }}>
+            <p className="text-xs text-muted-foreground font-body">
               Guardamos só um rótulo da forma de pagamento (ex.: "Cartão de crédito"), não o número do cartão —
               este protótipo não processa pagamentos de verdade.
             </p>
 
-            <button onClick={saveInfo} disabled={savingInfo} style={saveButtonStyle(savingInfo)}>
-              {savingInfo ? "Salvando..." : savedInfo ? "✓ Salvo!" : "Salvar dados"}
+            {saveInfoMutation.isError && (
+              <p className="text-red-500 text-[13px] font-body">
+                {errorMessage(saveInfoMutation.error, "Não foi possível salvar seus dados. Verifique se o json-server está rodando.")}
+              </p>
+            )}
+
+            <button type="submit" disabled={saveInfoMutation.isPending} className={saveButtonClass(saveInfoMutation.isPending)}>
+              {saveInfoMutation.isPending ? "Salvando..." : saveInfoMutation.isSuccess ? "✓ Salvo!" : "Salvar dados"}
             </button>
-          </div>
+          </form>
         </section>
 
         {/* Metas por categoria */}
-        <section style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "18px", padding: "20px" }}>
-          <h2 style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "16px", margin: "0 0 6px" }}>
-            Metas por categoria
-          </h2>
-          <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: "0 0 16px" }}>
+        <section className="bg-card border border-border rounded-[18px] p-5">
+          <h2 className="font-heading font-bold text-base mb-1.5">Metas por categoria</h2>
+          <p className="text-xs text-muted-foreground font-body mb-4">
             Define quanto você quer gastar por mês em cada categoria. Essas metas alimentam as barras de progresso do Dashboard.
           </p>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <form
+            onSubmit={budgetsForm.handleSubmit((values) => saveBudgetsMutation.mutate(values))}
+            noValidate
+            className="flex flex-col gap-3"
+          >
             {CATEGORIES.map((cat) => (
-              <Field key={cat} label={cat}>
-                <div style={{ position: "relative" }}>
-                  <span style={{
-                    position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)",
-                    fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "14px", color: "var(--primary)",
-                  }}>R$</span>
+              <Field key={cat} label={cat} error={budgetsForm.formState.errors[cat]?.message}>
+                <div className="relative">
+                  <span className="absolute left-[14px] top-1/2 -translate-y-1/2 font-heading font-semibold text-sm text-primary">
+                    R$
+                  </span>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
-                    value={budgets[cat]}
-                    onChange={(e) => setBudgets({ ...budgets, [cat]: Number(e.target.value) })}
-                    style={{ ...inputStyle, paddingLeft: "40px" }}
+                    className={`${baseInputClass} pl-10 pr-[14px]`}
+                    {...budgetsForm.register(cat)}
                   />
                 </div>
               </Field>
             ))}
 
-            <button onClick={saveBudgets} disabled={savingBudgets} style={saveButtonStyle(savingBudgets)}>
-              {savingBudgets ? "Salvando..." : savedBudgets ? "✓ Salvo!" : "Salvar metas"}
+            {saveBudgetsMutation.isError && (
+              <p className="text-red-500 text-[13px] font-body">
+                {errorMessage(saveBudgetsMutation.error, "Não foi possível salvar suas metas. Verifique se o json-server está rodando.")}
+              </p>
+            )}
+
+            <button type="submit" disabled={saveBudgetsMutation.isPending} className={saveButtonClass(saveBudgetsMutation.isPending)}>
+              {saveBudgetsMutation.isPending ? "Salvando..." : saveBudgetsMutation.isSuccess ? "✓ Salvo!" : "Salvar metas"}
             </button>
-          </div>
+          </form>
         </section>
 
         {/* Como confirmar pagamentos */}
-        <section style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "18px", padding: "20px" }}>
-          <h2 style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "16px", margin: "0 0 8px" }}>
-            Como confirmar pagamentos
-          </h2>
-          <p style={{ fontSize: "13px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0, lineHeight: 1.5 }}>
-            Abra uma assinatura e toque em <strong style={{ color: "var(--foreground)" }}>"Confirmar Pagamento"</strong> quando
+        <section className="bg-card border border-border rounded-[18px] p-5">
+          <h2 className="font-heading font-bold text-base mb-2">Como confirmar pagamentos</h2>
+          <p className="text-[13px] text-muted-foreground font-body leading-[1.5]">
+            Abra uma assinatura e toque em <strong className="text-foreground">"Confirmar Pagamento"</strong> quando
             a cobrança cair na sua conta. Se preferir, importe o extrato do banco: quando uma cobrança já existente
             é encontrada lá, o SubTracker confirma o pagamento automaticamente, em vez de criar uma assinatura duplicada.
           </p>
@@ -209,12 +184,7 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
 
         <button
           onClick={onLogout}
-          style={{
-            padding: "14px", borderRadius: "14px",
-            border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.07)",
-            color: "#ef4444", fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "14px",
-            cursor: "pointer",
-          }}
+          className="p-[14px] rounded-[14px] border border-red-500/30 bg-red-500/7 text-red-500 font-heading font-semibold text-sm cursor-pointer"
         >
           Sair da conta
         </button>
@@ -223,33 +193,12 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%", boxSizing: "border-box",
-  background: "var(--background)", border: "1px solid var(--border)",
-  borderRadius: "12px", padding: "12px 14px",
-  fontFamily: "Inter, sans-serif", fontSize: "14px",
-  color: "var(--foreground)", outline: "none",
-};
-
-function saveButtonStyle(busy: boolean): React.CSSProperties {
-  return {
-    width: "100%", padding: "13px",
-    borderRadius: "12px", border: "none",
-    background: busy ? "var(--muted)" : "var(--primary)",
-    color: busy ? "var(--muted-foreground)" : "var(--primary-foreground)",
-    fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "14px",
-    cursor: busy ? "not-allowed" : "pointer",
-    marginTop: "4px",
-  };
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, error }: { label: string; children: ReactNode; error?: string }) {
   return (
     <div>
-      <label style={{ display: "block", fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", marginBottom: "6px" }}>
-        {label}
-      </label>
+      <label className="block text-xs text-muted-foreground font-body mb-1.5">{label}</label>
       {children}
+      {error && <p className="text-red-500 text-xs font-body mt-1">{error}</p>}
     </div>
   );
 }

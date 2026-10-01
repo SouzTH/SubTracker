@@ -1,9 +1,13 @@
-import { useState } from "react";
-import { Subscription, Screen } from "../App";
+import { useState, ReactNode } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Screen, Subscription, getStoredUser } from "../App";
+import { subscriptionSchema, SubscriptionFormValues, CATEGORY_VALUES, PERIOD_VALUES } from "../schemas/subscription";
+import { createSub, ApiError } from "../lib/api";
+import { subsQueryKey } from "../lib/queryClient";
 
 interface Props {
-  subs: Subscription[];
-  setSubs: (s: Subscription[]) => void;
   navigate: (s: Screen) => void;
 }
 
@@ -17,147 +21,119 @@ const SERVICES = [
   { name: "Academia", icon: "💪", color: "#f59e0b", category: "Fitness" },
   { name: "PlayStation+", icon: "🎮", color: "#003087", category: "Jogos" },
   { name: "Outro", icon: "📦", color: "#64748b", category: "Outros" },
-];
+] as const;
 
-const CATEGORIES = ["Streaming", "Trabalho", "Fitness", "Música", "Jogos", "Outros"] as const;
-const PERIODS = ["Mensal", "Trimestral", "Anual"] as const;
 const PAYMENTS = ["Cartão de crédito", "Débito automático", "Pix", "Boleto"];
 
-export default function AddSubscription({ subs, setSubs, navigate }: Props) {
-  const [step, setStep] = useState<"service" | "details">("service");
-  const [selected, setSelected] = useState<typeof SERVICES[0] | null>(null);
-  const [value, setValue] = useState("");
-  const [period, setPeriod] = useState<"Mensal" | "Trimestral" | "Anual">("Mensal");
-  const [nextCharge, setNextCharge] = useState("2026-10-01");
-  const [category, setCategory] = useState<typeof CATEGORIES[number]>("Streaming");
-  const [payment, setPayment] = useState(PAYMENTS[0]);
+type Service = (typeof SERVICES)[number];
 
-  const handleSelectService = (s: typeof SERVICES[0]) => {
+export default function AddSubscription({ navigate }: Props) {
+  const [step, setStep] = useState<"service" | "details">("service");
+  const [selected, setSelected] = useState<Service | null>(null);
+  const queryClient = useQueryClient();
+  const user = getStoredUser();
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<SubscriptionFormValues>({
+    resolver: zodResolver(subscriptionSchema),
+    defaultValues: {
+      period: "Mensal",
+      nextCharge: new Date().toISOString().slice(0, 10),
+      paymentMethod: PAYMENTS[0],
+      category: "Streaming",
+    },
+  });
+
+  const period = watch("period");
+  const category = watch("category");
+
+  const handleSelectService = (s: Service) => {
     setSelected(s);
-    setCategory(s.category as typeof CATEGORIES[number]);
+    setValue("category", s.category as SubscriptionFormValues["category"]);
     setStep("details");
   };
 
-  // FUNÇÃO ATUALIZADA PARA ENVIAR O USER ID
-  const handleSave = async () => {
-    if (!selected || !value) return;
-    
-    // 1. Resgata os dados do usuário ativo
-    const userStorage = localStorage.getItem('subtracker_user');
-    if (!userStorage) {
-        alert("Sessão expirada. Faça login novamente.");
-        return;
-    }
-    const currentUser = JSON.parse(userStorage);
+  const saveMutation = useMutation({
+    mutationFn: (values: SubscriptionFormValues) => {
+      if (!selected || !user) throw new ApiError("Sessão expirada. Faça login novamente.");
+      const payload: Omit<Subscription, "id"> = {
+        userId: user.id,
+        name: selected.name,
+        category: values.category,
+        value: values.value,
+        period: values.period,
+        nextCharge: values.nextCharge,
+        paymentMethod: values.paymentMethod,
+        status: "Ativa",
+        color: selected.color,
+        icon: selected.icon,
+        history: [],
+      };
+      return createSub(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: subsQueryKey(user?.id) });
+      navigate("dashboard");
+    },
+  });
 
-    // 2. Monta o objeto com a propriedade userId incluída
-    // O tipo 'any' é usado temporariamente para o TypeScript não reclamar da nova propriedade
-    const newSub: any = {
-      id: Date.now().toString(), // Convertido para string para total compatibilidade com json-server
-      userId: currentUser.id,    // VINCULA A ASSINATURA AO SEU USUÁRIO
-      name: selected.name,
-      category,
-      value: parseFloat(value.replace(",", ".")),
-      period,
-      nextCharge,
-      paymentMethod: payment,
-      status: "Ativa",
-      color: selected.color,
-      icon: selected.icon,
-      history: [],
-    };
-
-    try {
-      // Faz o pedido POST para gravar os dados
-      const response = await fetch("http://localhost:3000/subs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newSub),
-      });
-
-      if (response.ok) {
-        // Se correu bem, atualiza o ecrã e volta ao dashboard
-        const savedSub = await response.json();
-        setSubs([...subs, savedSub]);
-        navigate("dashboard");
-      } else {
-        console.error("Erro ao guardar no servidor");
-      }
-    } catch (error) {
-      console.error("Erro de ligação ao servidor:", error);
-    }
-  };
+  const onSubmit = (values: SubscriptionFormValues) => saveMutation.mutate(values);
 
   return (
-    <div style={{ flex: 1, overflowY: "auto" }}>
+    <div className="flex-1 overflow-y-auto">
       {/* Header */}
-      <div style={{ padding: "56px 24px 20px", display: "flex", alignItems: "center", gap: "16px" }}>
+      <div className="pt-14 px-6 pb-5 flex items-center gap-4">
         <button
-          onClick={() => step === "details" ? setStep("service") : navigate("dashboard")}
-          style={{
-            width: "36px", height: "36px", borderRadius: "12px",
-            background: "var(--secondary)", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "18px", color: "var(--foreground)",
-          }}
+          onClick={() => (step === "details" ? setStep("service") : navigate("dashboard"))}
+          className="w-9 h-9 rounded-sm bg-secondary border-none cursor-pointer flex items-center justify-center text-lg text-foreground"
         >
           ←
         </button>
         <div>
-          <h1 style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "22px", margin: 0 }}>
+          <h1 className="font-heading font-bold text-[22px]">
             {step === "service" ? "Escolher serviço" : "Detalhes"}
           </h1>
-          <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", margin: 0 }}>
+          <p className="text-xs text-muted-foreground font-body">
             {step === "service" ? "Passo 1 de 2" : "Passo 2 de 2"}
           </p>
         </div>
       </div>
 
       {/* Progress */}
-      <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ height: "3px", background: "var(--border)", borderRadius: "4px" }}>
-          <div style={{
-            height: "100%", borderRadius: "4px",
-            width: step === "service" ? "50%" : "100%",
-            background: "var(--primary)",
-            transition: "width 0.3s ease",
-          }} />
+      <div className="px-6 pb-6">
+        <div className="h-[3px] bg-border rounded-[4px]">
+          <div
+            className={`h-full rounded-[4px] bg-primary transition-[width] duration-300 ease-in-out ${
+              step === "service" ? "w-1/2" : "w-full"
+            }`}
+          />
         </div>
       </div>
 
       {step === "service" && (
-        <div style={{ padding: "0 24px" }}>
-          <p style={{ fontSize: "14px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", marginBottom: "16px" }}>
+        <div className="px-6">
+          <p className="text-sm text-muted-foreground font-body mb-4">
             Selecione o serviço que deseja adicionar
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+          <div className="grid grid-cols-3 gap-2.5">
             {SERVICES.map((s) => (
               <button
                 key={s.name}
                 onClick={() => handleSelectService(s)}
-                style={{
-                  background: "var(--card)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "16px",
-                  padding: "20px 8px",
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
-                  cursor: "pointer",
-                  transition: "border-color 0.15s",
-                }}
+                className="bg-card border border-border rounded-md py-5 px-2 flex flex-col items-center gap-2 cursor-pointer transition-colors duration-150"
               >
-                <div style={{
-                  width: "44px", height: "44px", borderRadius: "12px",
-                  background: `${s.color}22`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "22px",
-                }}>
+                <div
+                  className="w-11 h-11 rounded-sm flex items-center justify-center text-[22px]"
+                  style={{ background: `${s.color}22` }}
+                >
                   {s.icon}
                 </div>
-                <span style={{ fontSize: "11px", fontFamily: "Inter, sans-serif", color: "var(--foreground)", textAlign: "center" }}>
-                  {s.name}
-                </span>
+                <span className="text-[11px] font-body text-foreground text-center">{s.name}</span>
               </button>
             ))}
           </div>
@@ -165,65 +141,49 @@ export default function AddSubscription({ subs, setSubs, navigate }: Props) {
       )}
 
       {step === "details" && selected && (
-        <div style={{ padding: "0 24px" }}>
+        <form className="px-6" onSubmit={handleSubmit(onSubmit)} noValidate>
           {/* Selected service preview */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: "14px",
-            background: "var(--card)", borderRadius: "16px", padding: "16px",
-            marginBottom: "24px", border: "1px solid var(--border)",
-          }}>
-            <div style={{
-              width: "52px", height: "52px", borderRadius: "14px",
-              background: `${selected.color}22`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "26px",
-            }}>
+          <div className="flex items-center gap-[14px] bg-card rounded-md py-4 px-4 mb-6 border border-border">
+            <div
+              className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center text-[26px]"
+              style={{ background: `${selected.color}22` }}
+            >
               {selected.icon}
             </div>
             <div>
-              <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "17px" }}>{selected.name}</p>
-              <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif" }}>{selected.category}</p>
+              <p className="font-heading font-semibold text-[17px]">{selected.name}</p>
+              <p className="text-xs text-muted-foreground font-body">{selected.category}</p>
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+          <div className="flex flex-col gap-[18px]">
             {/* Value */}
-            <Field label="Valor da assinatura">
-              <div style={{ position: "relative" }}>
-                <span style={{
-                  position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)",
-                  fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "16px", color: "var(--primary)",
-                }}>R$</span>
+            <Field label="Valor da assinatura" error={errors.value?.message}>
+              <div className="relative">
+                <span className="absolute left-[14px] top-1/2 -translate-y-1/2 font-heading font-semibold text-base text-primary">
+                  R$
+                </span>
                 <input
                   type="number"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
+                  step="0.01"
                   placeholder="0,00"
-                  style={{
-                    width: "100%", boxSizing: "border-box",
-                    background: "var(--card)", border: "1px solid var(--border)",
-                    borderRadius: "12px", padding: "14px 14px 14px 44px",
-                    fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "18px",
-                    color: "var(--foreground)", outline: "none",
-                  }}
+                  className="w-full box-border bg-card border border-border rounded-sm py-[14px] pr-[14px] pl-11 font-heading font-semibold text-lg text-foreground outline-none"
+                  {...register("value")}
                 />
               </div>
             </Field>
 
             {/* Period */}
-            <Field label="Periodicidade">
-              <div style={{ display: "flex", gap: "8px" }}>
-                {PERIODS.map((p) => (
+            <Field label="Periodicidade" error={errors.period?.message}>
+              <div className="flex gap-2">
+                {PERIOD_VALUES.map((p) => (
                   <button
                     key={p}
-                    onClick={() => setPeriod(p)}
-                    style={{
-                      flex: 1, padding: "12px 4px", borderRadius: "12px", border: "none",
-                      background: period === p ? "var(--primary)" : "var(--card)",
-                      color: period === p ? "var(--primary-foreground)" : "var(--muted-foreground)",
-                      fontFamily: "Inter, sans-serif", fontWeight: 500, fontSize: "13px",
-                      cursor: "pointer", transition: "all 0.15s",
-                    }}
+                    type="button"
+                    onClick={() => setValue("period", p, { shouldValidate: true })}
+                    className={`flex-1 py-3 px-1 rounded-sm border-none font-body font-medium text-[13px] cursor-pointer transition-colors ${
+                      period === p ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
+                    }`}
                   >
                     {p}
                   </button>
@@ -232,37 +192,27 @@ export default function AddSubscription({ subs, setSubs, navigate }: Props) {
             </Field>
 
             {/* Next charge */}
-            <Field label="Próxima cobrança">
+            <Field label="Próxima cobrança" error={errors.nextCharge?.message}>
               <input
                 type="date"
-                value={nextCharge}
-                onChange={(e) => setNextCharge(e.target.value)}
-                style={{
-                  width: "100%", boxSizing: "border-box",
-                  background: "var(--card)", border: "1px solid var(--border)",
-                  borderRadius: "12px", padding: "14px",
-                  fontFamily: "Inter, sans-serif", fontSize: "14px",
-                  color: "var(--foreground)", outline: "none",
-                  colorScheme: "dark",
-                }}
+                className="w-full box-border bg-card border border-border rounded-sm p-[14px] font-body text-sm text-foreground outline-none [color-scheme:dark]"
+                {...register("nextCharge")}
               />
             </Field>
 
             {/* Category */}
-            <Field label="Categoria">
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {CATEGORIES.map((c) => (
+            <Field label="Categoria" error={errors.category?.message}>
+              <div className="flex gap-2 flex-wrap">
+                {CATEGORY_VALUES.map((c) => (
                   <button
                     key={c}
-                    onClick={() => setCategory(c)}
-                    style={{
-                      padding: "8px 14px", borderRadius: "20px",
-                      border: `1px solid ${category === c ? "var(--primary)" : "var(--border)"}`,
-                      background: category === c ? "rgba(0,212,170,0.1)" : "transparent",
-                      color: category === c ? "var(--primary)" : "var(--muted-foreground)",
-                      fontFamily: "Inter, sans-serif", fontSize: "13px", cursor: "pointer",
-                      transition: "all 0.15s",
-                    }}
+                    type="button"
+                    onClick={() => setValue("category", c, { shouldValidate: true })}
+                    className={`py-2 px-[14px] rounded-lg border font-body text-[13px] cursor-pointer transition-colors ${
+                      category === c
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-transparent text-muted-foreground"
+                    }`}
                   >
                     {c}
                   </button>
@@ -271,55 +221,46 @@ export default function AddSubscription({ subs, setSubs, navigate }: Props) {
             </Field>
 
             {/* Payment */}
-            <Field label="Forma de pagamento">
+            <Field label="Forma de pagamento" error={errors.paymentMethod?.message}>
               <select
-                value={payment}
-                onChange={(e) => setPayment(e.target.value)}
-                style={{
-                  width: "100%",
-                  background: "var(--card)", border: "1px solid var(--border)",
-                  borderRadius: "12px", padding: "14px",
-                  fontFamily: "Inter, sans-serif", fontSize: "14px",
-                  color: "var(--foreground)", outline: "none",
-                  colorScheme: "dark", appearance: "none",
-                  cursor: "pointer",
-                }}
+                className="w-full bg-card border border-border rounded-sm p-[14px] font-body text-sm text-foreground outline-none [color-scheme:dark] appearance-none cursor-pointer"
+                {...register("paymentMethod")}
               >
-                {PAYMENTS.map((p) => <option key={p}>{p}</option>)}
+                {PAYMENTS.map((p) => (
+                  <option key={p}>{p}</option>
+                ))}
               </select>
             </Field>
 
+            {saveMutation.isError && (
+              <p className="text-red-500 text-[13px] font-body">
+                {saveMutation.error instanceof ApiError
+                  ? saveMutation.error.message
+                  : "Não foi possível salvar. Tente novamente."}
+              </p>
+            )}
+
             {/* Save */}
             <button
-              onClick={handleSave}
-              disabled={!value}
-              style={{
-                width: "100%", padding: "16px",
-                borderRadius: "16px", border: "none",
-                background: value ? "var(--primary)" : "var(--muted)",
-                color: value ? "var(--primary-foreground)" : "var(--muted-foreground)",
-                fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "16px",
-                cursor: value ? "pointer" : "not-allowed",
-                transition: "all 0.15s",
-                marginBottom: "24px",
-              }}
+              type="submit"
+              disabled={saveMutation.isPending}
+              className="w-full p-4 rounded-md border-none font-heading font-bold text-base transition-colors mb-6 bg-primary text-primary-foreground cursor-pointer disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
             >
-              Salvar assinatura
+              {saveMutation.isPending ? "Salvando..." : "Salvar assinatura"}
             </button>
           </div>
-        </div>
+        </form>
       )}
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, error }: { label: string; children: ReactNode; error?: string }) {
   return (
     <div>
-      <label style={{ display: "block", fontSize: "13px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", marginBottom: "8px" }}>
-        {label}
-      </label>
+      <label className="block text-[13px] text-muted-foreground font-body mb-2">{label}</label>
       {children}
+      {error && <p className="text-red-500 text-xs font-body mt-1">{error}</p>}
     </div>
   );
 }

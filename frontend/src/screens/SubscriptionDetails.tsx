@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { Subscription, Screen } from "../App";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Subscription, Screen, getStoredUser } from "../App";
+import { updateSub, deleteSub } from "../lib/api";
+import { subsQueryKey } from "../lib/queryClient";
 
 const CANCEL_URLS: Record<string, string> = {
   Netflix: "https://www.netflix.com/cancelplan",
@@ -14,8 +16,6 @@ const CANCEL_URLS: Record<string, string> = {
 
 interface Props {
   sub: Subscription;
-  subs: Subscription[];
-  setSubs: (s: Subscription[]) => void;
   navigate: (s: Screen, id?: string | number) => void;
 }
 
@@ -35,117 +35,86 @@ function formatDate(iso: string) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
-export default function SubscriptionDetails({ sub, subs, setSubs, navigate }: Props) {
-  const [busy, setBusy] = useState<"pause" | "pay" | "delete" | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export default function SubscriptionDetails({ sub, navigate }: Props) {
+  const queryClient = useQueryClient();
+  const user = getStoredUser();
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: subsQueryKey(user?.id) });
 
-  const patchSub = async (patch: Partial<Subscription>) => {
-    const response = await fetch(`http://localhost:3000/subs/${sub.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    if (!response.ok) throw new Error("Falha ao atualizar assinatura");
-    const updated = await response.json();
-    setSubs(subs.map((s) => (s.id === sub.id ? updated : s)));
-  };
+  const pauseMutation = useMutation({
+    mutationFn: () => updateSub(sub.id, { status: sub.status === "Ativa" ? "Pausada" : "Ativa" }),
+    onSuccess: invalidate,
+  });
 
-  const handleTogglePause = async () => {
-    setBusy("pause");
-    setError(null);
-    try {
-      await patchSub({ status: sub.status === "Ativa" ? "Pausada" : "Ativa" });
-    } catch (e) {
-      console.error(e);
-      setError("Não foi possível atualizar o status. Tente novamente.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const handleConfirmPayment = async () => {
-    setBusy("pay");
-    setError(null);
-    try {
+  const payMutation = useMutation({
+    mutationFn: () => {
       const newEntry = { date: sub.nextCharge, value: sub.value, status: "Pago" as const };
-      await patchSub({
+      return updateSub(sub.id, {
         history: [...sub.history, newEntry],
         nextCharge: addCycle(sub.nextCharge, sub.period),
       });
-    } catch (e) {
-      console.error(e);
-      setError("Não foi possível confirmar o pagamento. Tente novamente.");
-    } finally {
-      setBusy(null);
-    }
-  };
+    },
+    onSuccess: invalidate,
+  });
 
-  const handleDelete = async () => {
-    const ok = window.confirm(`Tem certeza que deseja excluir "${sub.name}"? Essa ação não pode ser desfeita.`);
-    if (!ok) return;
-    setBusy("delete");
-    setError(null);
-    try {
-      const response = await fetch(`http://localhost:3000/subs/${sub.id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Falha ao excluir");
-      setSubs(subs.filter((s) => s.id !== sub.id));
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteSub(sub.id),
+    onSuccess: () => {
+      invalidate();
       navigate("dashboard");
-    } catch (e) {
-      console.error(e);
-      setError("Não foi possível excluir a assinatura. Tente novamente.");
-      setBusy(null);
-    }
+    },
+  });
+
+  const busy = pauseMutation.isPending ? "pause" : payMutation.isPending ? "pay" : deleteMutation.isPending ? "delete" : null;
+  const error = pauseMutation.isError
+    ? "Não foi possível atualizar o status. Tente novamente."
+    : payMutation.isError
+      ? "Não foi possível confirmar o pagamento. Tente novamente."
+      : deleteMutation.isError
+        ? "Não foi possível excluir a assinatura. Tente novamente."
+        : null;
+
+  const handleDelete = () => {
+    const ok = window.confirm(`Tem certeza que deseja excluir "${sub.name}"? Essa ação não pode ser desfeita.`);
+    if (ok) deleteMutation.mutate();
   };
 
   return (
-    <div style={{ flex: 1, overflowY: "auto" }}>
+    <div className="flex-1 overflow-y-auto">
       {/* Header with gradient */}
-      <div style={{
-        background: `linear-gradient(160deg, ${sub.color}28 0%, transparent 60%)`,
-        padding: "56px 24px 24px",
-        borderBottom: "1px solid var(--border)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "24px" }}>
+      <div
+        className="pt-14 px-6 pb-6 border-b border-border"
+        style={{ background: `linear-gradient(160deg, ${sub.color}28 0%, transparent 60%)` }}
+      >
+        <div className="flex items-center gap-[14px] mb-6">
           <button
             onClick={() => navigate("dashboard")}
-            style={{
-              width: "36px", height: "36px", borderRadius: "12px",
-              background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "18px", color: "var(--foreground)",
-            }}
+            className="w-9 h-9 rounded-sm bg-white/8 border-none cursor-pointer flex items-center justify-center text-lg text-foreground"
           >
             ←
           </button>
-          <h1 style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "20px", margin: 0 }}>
+          <h1 className="font-heading font-bold text-xl">
             Detalhes
           </h1>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
-          <div style={{
-            width: "72px", height: "72px", borderRadius: "20px",
-            background: `${sub.color}22`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "36px",
-            border: `1.5px solid ${sub.color}44`,
-          }}>
+        <div className="flex items-center gap-[18px]">
+          <div
+            className="w-[72px] h-[72px] rounded-lg flex items-center justify-center text-4xl border-[1.5px]"
+            style={{ background: `${sub.color}22`, borderColor: `${sub.color}44` }}
+          >
             {sub.icon}
           </div>
           <div>
-            <h2 style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "26px", margin: "0 0 4px" }}>
+            <h2 className="font-heading font-bold text-[26px] mb-1">
               {sub.name}
             </h2>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "13px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif" }}>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] text-muted-foreground font-body">
                 {sub.category}
               </span>
-              <span style={{
-                fontSize: "11px", padding: "3px 10px", borderRadius: "20px",
-                background: sub.status === "Ativa" ? "rgba(0,212,170,0.15)" : "rgba(100,116,139,0.2)",
-                color: sub.status === "Ativa" ? "var(--primary)" : "var(--muted-foreground)",
-                fontFamily: "Inter, sans-serif", fontWeight: 500,
-              }}>
+              <span className={`text-[11px] py-[3px] px-2.5 rounded-lg font-body font-medium ${
+                sub.status === "Ativa" ? "bg-primary/15 text-primary" : "bg-slate-500/20 text-muted-foreground"
+              }`}>
                 {sub.status}
               </span>
             </div>
@@ -154,12 +123,9 @@ export default function SubscriptionDetails({ sub, subs, setSubs, navigate }: Pr
       </div>
 
       {/* Main value */}
-      <div style={{ padding: "24px 24px 0" }}>
-        <div style={{
-          background: "var(--card)", borderRadius: "20px", padding: "20px",
-          border: "1px solid var(--border)", marginBottom: "16px",
-        }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+      <div className="pt-6 px-6">
+        <div className="bg-card rounded-lg p-5 border border-border mb-4">
+          <div className="grid grid-cols-2 gap-5">
             <InfoBlock label="Valor" value={fmt(sub.value)} large accent />
             <InfoBlock label="Periodicidade" value={sub.period} />
             <InfoBlock label="Próxima cobrança" value={formatDate(sub.nextCharge)} />
@@ -168,76 +134,61 @@ export default function SubscriptionDetails({ sub, subs, setSubs, navigate }: Pr
         </div>
 
         {/* Annual projection */}
-        <div style={{
-          background: `${sub.color}12`,
-          border: `1px solid ${sub.color}30`,
-          borderRadius: "16px", padding: "16px 20px",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          marginBottom: "24px",
-        }}>
+        <div
+          className="border rounded-md py-4 px-5 flex justify-between items-center mb-6"
+          style={{ background: `${sub.color}12`, borderColor: `${sub.color}30` }}
+        >
           <div>
-            <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", marginBottom: "4px" }}>
+            <p className="text-xs text-muted-foreground font-body mb-1">
               Projeção anual
             </p>
-            <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "22px", color: "var(--foreground)" }}>
+            <p className="font-heading font-bold text-[22px] text-foreground">
               {fmt(sub.value * (sub.period === "Mensal" ? 12 : sub.period === "Trimestral" ? 4 : 1))}
             </p>
           </div>
-          <div style={{
-            width: "44px", height: "44px", borderRadius: "14px",
-            background: `${sub.color}22`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "22px",
-          }}>
+          <div
+            className="w-11 h-11 rounded-[14px] flex items-center justify-center text-[22px]"
+            style={{ background: `${sub.color}22` }}
+          >
             📊
           </div>
         </div>
 
         {/* Billing history */}
         <div>
-          <p style={{ fontSize: "16px", fontWeight: "600", fontFamily: "Outfit, sans-serif", marginBottom: "12px" }}>
+          <p className="text-base font-semibold font-heading mb-3">
             Histórico de cobranças
           </p>
           {sub.history.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "32px", color: "var(--muted-foreground)", fontSize: "14px" }}>
+            <div className="text-center py-8 text-muted-foreground text-sm">
               Nenhuma cobrança registrada
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div className="flex flex-col gap-2">
               {sub.history.map((h, i) => (
-                <div key={i} style={{
-                  background: "var(--card)", borderRadius: "14px", padding: "14px 16px",
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  border: "1px solid var(--border)",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <div style={{
-                      width: "36px", height: "36px", borderRadius: "10px",
-                      background: h.status === "Pago" ? "rgba(0,212,170,0.12)" : "rgba(245,158,11,0.12)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "16px",
-                    }}>
+                <div key={i} className="bg-card rounded-[14px] py-[14px] px-4 flex items-center justify-between border border-border">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center text-base ${
+                      h.status === "Pago" ? "bg-primary/12" : "bg-amber-500/12"
+                    }`}>
                       {h.status === "Pago" ? "✓" : "⏳"}
                     </div>
                     <div>
-                      <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "14px", marginBottom: "2px" }}>
+                      <p className="font-heading font-semibold text-sm mb-0.5">
                         {new Date(h.date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}
                       </p>
-                      <p style={{ fontSize: "12px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif" }}>
+                      <p className="text-xs text-muted-foreground font-body">
                         {new Date(h.date + "T00:00:00").getFullYear()}
                       </p>
                     </div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <p style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "15px", marginBottom: "4px" }}>
+                  <div className="text-right">
+                    <p className="font-heading font-bold text-[15px] mb-1">
                       {fmt(h.value)}
                     </p>
-                    <span style={{
-                      fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
-                      background: h.status === "Pago" ? "rgba(0,212,170,0.15)" : "rgba(245,158,11,0.15)",
-                      color: h.status === "Pago" ? "var(--primary)" : "#f59e0b",
-                      fontFamily: "Inter, sans-serif",
-                    }}>
+                    <span className={`text-[11px] py-0.5 px-2 rounded-[10px] font-body ${
+                      h.status === "Pago" ? "bg-primary/15 text-primary" : "bg-amber-500/15 text-amber-500"
+                    }`}>
                       {h.status}
                     </span>
                   </div>
@@ -249,61 +200,41 @@ export default function SubscriptionDetails({ sub, subs, setSubs, navigate }: Pr
       </div>
 
       {/* Actions */}
-      <div style={{ padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div className="py-4 px-6 pb-6 flex flex-col gap-2.5">
         {error && (
-          <div style={{
-            background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
-            borderRadius: "12px", padding: "12px 14px",
-            color: "#ef4444", fontFamily: "Inter, sans-serif", fontSize: "13px",
-          }}>
+          <div className="bg-red-500/8 border border-red-500/25 rounded-sm py-3 px-[14px] text-red-500 font-body text-[13px]">
             {error}
           </div>
         )}
 
         {sub.status === "Ativa" && (
           <button
-            onClick={handleConfirmPayment}
+            onClick={() => payMutation.mutate()}
             disabled={busy !== null}
-            style={{
-              padding: "14px",
-              borderRadius: "14px", border: "none",
-              background: "var(--primary)",
-              color: "var(--primary-foreground)",
-              fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "14px",
-              cursor: busy !== null ? "not-allowed" : "pointer",
-              opacity: busy !== null && busy !== "pay" ? 0.6 : 1,
-            }}
+            className={`p-[14px] rounded-[14px] border-none bg-primary text-primary-foreground font-heading font-bold text-sm ${
+              busy !== null ? "cursor-not-allowed" : "cursor-pointer"
+            } ${busy !== null && busy !== "pay" ? "opacity-60" : "opacity-100"}`}
           >
             {busy === "pay" ? "Confirmando..." : "✓ Confirmar Pagamento"}
           </button>
         )}
 
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div className="flex gap-2.5">
           <button
-            onClick={handleTogglePause}
+            onClick={() => pauseMutation.mutate()}
             disabled={busy !== null}
-            style={{
-              flex: 1, padding: "14px",
-              borderRadius: "14px", border: "1px solid var(--border)",
-              background: "var(--card)",
-              color: "var(--muted-foreground)",
-              fontFamily: "Outfit, sans-serif", fontWeight: 600, fontSize: "14px",
-              cursor: busy !== null ? "not-allowed" : "pointer",
-              opacity: busy !== null && busy !== "pause" ? 0.6 : 1,
-            }}
+            className={`flex-1 p-[14px] rounded-[14px] border border-border bg-card text-muted-foreground font-heading font-semibold text-sm ${
+              busy !== null ? "cursor-not-allowed" : "cursor-pointer"
+            } ${busy !== null && busy !== "pause" ? "opacity-60" : "opacity-100"}`}
           >
             {busy === "pause" ? "..." : sub.status === "Ativa" ? "⏸ Pausar" : "▶ Reativar"}
           </button>
-          
+
           {/* 👇 AQUI ESTÁ A CORREÇÃO DO BOTÃO 👇 */}
-          <button onClick={() => navigate("edit", sub.id)} style={{
-            flex: 1, padding: "14px",
-            borderRadius: "14px", border: "none",
-            background: "var(--primary)",
-            color: "var(--primary-foreground)",
-            fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: "14px",
-            cursor: "pointer",
-          }}>
+          <button
+            onClick={() => navigate("edit", sub.id)}
+            className="flex-1 p-[14px] rounded-[14px] border-none bg-primary text-primary-foreground font-heading font-bold text-sm cursor-pointer"
+          >
             ✎ Editar
           </button>
         </div>
@@ -314,26 +245,10 @@ export default function SubscriptionDetails({ sub, subs, setSubs, navigate }: Pr
             href={CANCEL_URLS[sub.name]}
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              padding: "14px",
-              borderRadius: "14px",
-              border: "1px solid rgba(239,68,68,0.3)",
-              background: "rgba(239,68,68,0.07)",
-              color: "#ef4444",
-              fontFamily: "Outfit, sans-serif",
-              fontWeight: 600,
-              fontSize: "14px",
-              textDecoration: "none",
-              cursor: "pointer",
-              transition: "background 0.15s",
-            }}
+            className="flex items-center justify-center gap-2 p-[14px] rounded-[14px] border border-red-500/30 bg-red-500/7 text-red-500 font-heading font-semibold text-sm no-underline cursor-pointer transition-colors duration-150"
           >
             <span>Cancelar no Provedor</span>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
               <path d="M2 2h10v10M12 2L2 12" stroke="#ef4444" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </a>
@@ -343,18 +258,9 @@ export default function SubscriptionDetails({ sub, subs, setSubs, navigate }: Pr
         <button
           onClick={handleDelete}
           disabled={busy !== null}
-          style={{
-            padding: "14px",
-            borderRadius: "14px",
-            border: "none",
-            background: "transparent",
-            color: "#ef4444",
-            fontFamily: "Inter, sans-serif",
-            fontWeight: 600,
-            fontSize: "13px",
-            cursor: busy !== null ? "not-allowed" : "pointer",
-            opacity: busy !== null && busy !== "delete" ? 0.6 : 1,
-          }}
+          className={`p-[14px] rounded-[14px] border-none bg-transparent text-red-500 font-body font-semibold text-[13px] ${
+            busy !== null ? "cursor-not-allowed" : "cursor-pointer"
+          } ${busy !== null && busy !== "delete" ? "opacity-60" : "opacity-100"}`}
         >
           {busy === "delete" ? "Excluindo..." : "🗑 Excluir assinatura"}
         </button>
@@ -366,16 +272,12 @@ export default function SubscriptionDetails({ sub, subs, setSubs, navigate }: Pr
 function InfoBlock({ label, value, large, accent }: { label: string; value: string; large?: boolean; accent?: boolean }) {
   return (
     <div>
-      <p style={{ fontSize: "11px", color: "var(--muted-foreground)", fontFamily: "Inter, sans-serif", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <p className="text-[11px] text-muted-foreground font-body mb-1 uppercase tracking-[0.05em]">
         {label}
       </p>
-      <p style={{
-        fontFamily: "Outfit, sans-serif",
-        fontWeight: large ? 800 : 600,
-        fontSize: large ? "24px" : "15px",
-        color: accent ? "var(--primary)" : "var(--foreground)",
-        lineHeight: 1.2,
-      }}>
+      <p className={`font-heading leading-[1.2] ${large ? "font-extrabold text-2xl" : "font-semibold text-[15px]"} ${
+        accent ? "text-primary" : "text-foreground"
+      }`}>
         {value}
       </p>
     </div>
