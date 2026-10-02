@@ -137,6 +137,11 @@
           "date": "2026-09-08",
           "value": 21.9,
           "status": "Pago"
+        },
+        {
+          "date": "2026-09-08",
+          "value": 21.9,
+          "status": "Pago"
         }
       ],
       "id": "AGbGH9Q0wbQ"
@@ -153,6 +158,11 @@
       "paymentMethod": "Cartão de crédito",
       "status": "Ativa",
       "history": [
+        {
+          "date": "2026-09-12",
+          "value": 95,
+          "status": "Pago"
+        },
         {
           "date": "2026-09-12",
           "value": 95,
@@ -187,6 +197,11 @@
           "date": "2026-09-22",
           "value": 25,
           "status": "Pago"
+        },
+        {
+          "date": "2026-09-22",
+          "value": 25,
+          "status": "Pago"
         }
       ],
       "id": "Vc8AlNmdW_I"
@@ -203,6 +218,11 @@
       "paymentMethod": "Cartão de crédito",
       "status": "Ativa",
       "history": [
+        {
+          "date": "2026-09-25",
+          "value": 54.9,
+          "status": "Pago"
+        },
         {
           "date": "2026-09-25",
           "value": 54.9,
@@ -238,6 +258,31 @@
     },
     {
       "userId": "OtuMY4VtnfE",
+      "name": "Adobe Creative",
+      "icon": "🎨",
+      "color": "#ff0000",
+      "category": "Trabalho",
+      "value": 20,
+      "period": "Mensal",
+      "nextCharge": "2026-10-18",
+      "paymentMethod": "Cartão de crédito",
+      "status": "Ativa",
+      "history": [
+        {
+          "date": "2026-09-18",
+          "value": 20,
+          "status": "Pago"
+        },
+        {
+          "date": "2026-09-18",
+          "value": 20,
+          "status": "Pago"
+        }
+      ],
+      "id": "HGKT6cPL0X4"
+    },
+    {
+      "userId": "OtuMY4VtnfE",
       "name": "Netflix",
       "icon": "🎬",
       "color": "#e50914",
@@ -254,27 +299,7 @@
           "status": "Pago"
         }
       ],
-      "id": "wPjpIWVDG00"
-    },
-    {
-      "userId": "OtuMY4VtnfE",
-      "name": "Adobe Creative",
-      "icon": "🎨",
-      "color": "#ff0000",
-      "category": "Trabalho",
-      "value": 20,
-      "period": "Mensal",
-      "nextCharge": "2026-10-18",
-      "paymentMethod": "Cartão de crédito",
-      "status": "Ativa",
-      "history": [
-        {
-          "date": "2026-09-18",
-          "value": 20,
-          "status": "Pago"
-        }
-      ],
-      "id": "HGKT6cPL0X4"
+      "id": "77uq_5MmGiM"
     }
   ],
   "$schema": "./node_modules/json-server/schema.json"

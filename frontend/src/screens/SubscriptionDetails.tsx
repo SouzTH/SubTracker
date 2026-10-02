@@ -3,6 +3,7 @@ import { Subscription, Screen, getStoredUser } from "../App";
 import { updateSub, deleteSub } from "../lib/api";
 import { subsQueryKey } from "../lib/queryClient";
 import { CANCEL_URLS } from "../constants/catalog";
+import { fmt, toMonthlyValue } from "../lib/money";
 
 interface Props {
   sub: Subscription;
@@ -14,10 +15,6 @@ function addCycle(iso: string, period: Subscription["period"]): string {
   const months = period === "Mensal" ? 1 : period === "Trimestral" ? 3 : 12;
   d.setMonth(d.getMonth() + months);
   return d.toISOString().slice(0, 10);
-}
-
-function fmt(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function formatDate(iso: string) {
@@ -133,7 +130,7 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
               Projeção anual
             </p>
             <p className="font-heading font-bold text-[22px] text-foreground">
-              {fmt(sub.value * (sub.period === "Mensal" ? 12 : sub.period === "Trimestral" ? 4 : 1))}
+              {fmt(toMonthlyValue(sub) * 12)}
             </p>
           </div>
           <div

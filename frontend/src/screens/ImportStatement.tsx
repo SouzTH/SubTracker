@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Screen, Subscription, getStoredUser } from "../App";
 import { createSub, updateSub, ApiError } from "../lib/api";
 import { subsQueryKey } from "../lib/queryClient";
+import { fmt } from "../lib/money";
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -44,10 +45,6 @@ function addCycle(iso: string, period: Subscription["period"]) {
   const months = period === "Mensal" ? 1 : period === "Trimestral" ? 3 : 12;
   d.setMonth(d.getMonth() + months);
   return d.toISOString().slice(0, 10);
-}
-
-function fmt(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export default function ImportStatement({ navigate, subs }: Props) {

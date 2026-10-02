@@ -1,4 +1,5 @@
 import { Subscription, Screen } from "../App"
+import { fmt, toMonthlyValue } from "../lib/money"
 
 interface Props {
   subs: Subscription[]
@@ -24,10 +25,6 @@ const daysUntil = (dateString: string) => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-function fmt(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-}
-
 const CATEGORY_COLOR: Record<string, string> = {
   Streaming: "#e50914",
   Trabalho: "#6e5494",
@@ -45,16 +42,17 @@ export default function Dashboard({ subs, navigate, budgets, userName }: Props) 
   // FIM DA LÓGICA DINÂMICA
 
   const active = subs.filter((s) => s.status === "Ativa")
-  const total = active.reduce((acc, s) => acc + s.value, 0)
+  const total = active.reduce((acc, s) => acc + toMonthlyValue(s), 0)
   const sorted = [...subs].sort(
     (a, b) =>
       new Date(a.nextCharge).getTime() - new Date(b.nextCharge).getTime(),
   )
 
-  // Build category totals for progress bars
+  // Build category totals for progress bars (sempre em valor mensal
+  // equivalente, para bater com os totais do Relatório)
   const byCategory: Record<string, number> = {}
   active.forEach((s) => {
-    byCategory[s.category] = (byCategory[s.category] ?? 0) + s.value
+    byCategory[s.category] = (byCategory[s.category] ?? 0) + toMonthlyValue(s)
   })
   const usedCategories = Object.entries(byCategory).sort((a, b) => b[1] - a[1])
 

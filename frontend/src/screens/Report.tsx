@@ -1,12 +1,9 @@
 import { Subscription, Screen } from "../App";
+import { fmt, toMonthlyValue } from "../lib/money";
 
 interface Props {
   subs: Subscription[];
   navigate: (s: Screen, id?: string | number) => void;
-}
-
-function fmt(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 const CATEGORY_COLOR: Record<string, string> = {
@@ -20,27 +17,20 @@ const CATEGORY_COLOR: Record<string, string> = {
 
 export default function Report({ subs, navigate }: Props) {
   const active = subs.filter((s) => s.status === "Ativa");
-  const monthly = active.reduce((acc, s) => {
-    const v = s.period === "Anual" ? s.value / 12 : s.period === "Trimestral" ? s.value / 3 : s.value;
-    return acc + v;
-  }, 0);
+  const monthly = active.reduce((acc, s) => acc + toMonthlyValue(s), 0);
   const annual = monthly * 12;
 
   // Category totals
   const byCategory: Record<string, number> = {};
   active.forEach((s) => {
-    const v = s.period === "Anual" ? s.value / 12 : s.period === "Trimestral" ? s.value / 3 : s.value;
-    byCategory[s.category] = (byCategory[s.category] ?? 0) + v;
+    byCategory[s.category] = (byCategory[s.category] ?? 0) + toMonthlyValue(s);
   });
   const sorted = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = sorted[0]?.[1] ?? 1;
 
   // Top subscriptions
   const topSubs = [...active]
-    .map((s) => ({
-      ...s,
-      monthly: s.period === "Anual" ? s.value / 12 : s.period === "Trimestral" ? s.value / 3 : s.value,
-    }))
+    .map((s) => ({ ...s, monthly: toMonthlyValue(s) }))
     .sort((a, b) => b.monthly - a.monthly)
     .slice(0, 3);
 
