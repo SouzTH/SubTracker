@@ -80,6 +80,9 @@ SubTracker/
     │   │   ├── api.ts         → todas as chamadas HTTP ao json-server, centralizadas
     │   │   └── queryClient.ts → configuração do TanStack Query
     │   ├── schemas/       → validações Zod usadas pelos formulários (react-hook-form)
+    │   ├── constants/     → catálogo de serviços e formas de pagamento (fonte única,
+    │   │                      evita repetir a mesma lista em várias telas)
+    │   ├── components/    → componentes pequenos reaproveitados entre telas (ex.: Field)
     │   ├── pages/Login/   → telas de login, cadastro e recuperação de senha
     │   └── screens/       → Dashboard, Nova Assinatura, Editar, Detalhes, Relatório,
     │                          Importar Extrato e Perfil
