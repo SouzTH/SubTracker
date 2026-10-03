@@ -5,9 +5,9 @@ Aplicação web para gestão e acompanhamento de subscrições (assinaturas) men
 Projeto desenvolvido para a disciplina de Programação de Software Web.
 
 **Integrantes:**
-* Rodrigo Américo Nascimento D'icarahy
-* Ronald Teixeira de Assis
-* Thiago Souza da Silva
+* Rodrigo Américo Nascimento D'icarahy.
+* Ronald Teixeira de Assis.
+* Thiago Souza da Silva.
 
 ## Funcionalidades atuais
 
