@@ -1,0 +1,91 @@
+// Schema do banco de dados, usando Prisma ORM + PostgreSQL.
+//
+// O Postgres sobe via Docker (veja docker-compose.yml) e a conexão vem de
+// DATABASE_URL no .env. Depois de mexer neste arquivo, rode
+// `npm run prisma:migrate`: o Prisma compara o schema com o banco, escreve
+// o SQL da diferença em prisma/migrations/ (versionado no git, como o
+// professor mostrou na aula) e aplica.
+//
+// O modelo abaixo espelha os campos que o frontend já espera em
+// `frontend/src/App.tsx` (interfaces Subscription e CurrentUser).
+//
+// Sobre `category`, `period` e `status` serem String: quem garante que só
+// entram valores válidos é o Zod (pacote shared), na borda da API. Enums do
+// Prisma não aceitam valores com acento (como "Música") sem @map extra, e
+// duplicariam a lista que já existe em shared/src/constants.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String  @id @default(cuid())
+  nome          String
+  email         String  @unique
+  passwordHash  String
+  telefone      String?
+  paymentMethod String? @default("Cartão de crédito")
+
+  // Metas por categoria (teto orçamentário), uma linha por categoria
+  // personalizada. Categorias que o usuário nunca editou não têm linha: o
+  // repositório completa com DEFAULT_BUDGETS na leitura (shared/constants).
+  budgets       Budget[]
+  subscriptions Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Budget {
+  id         String @id @default(cuid())
+  category   String // um dos valores de CATEGORY_VALUES
+  limitValue Float
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Uma meta por categoria por usuário — nunca duas linhas para "Streaming"
+  // do mesmo usuário.
+  @@unique([userId, category])
+  @@map("budgets")
+}
+
+model Subscription {
+  id            String @id @default(cuid())
+  name          String
+  category      String // um dos valores de CATEGORY_VALUES
+  value         Float
+  period        String // "Mensal" | "Trimestral" | "Anual"
+  nextCharge    String // formato ISO "yyyy-mm-dd", igual ao que o frontend já envia
+  paymentMethod String
+  status        String @default("Ativa") // "Ativa" | "Pausada"
+  color         String
+  icon          String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  history PaymentHistoryEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+model PaymentHistoryEntry {
+  id             String       @id @default(cuid())
+  date           String // ISO "yyyy-mm-dd"
+  value          Float
+  status         String // "Pago" | "Pendente"
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@map("payment_history_entries")
+}

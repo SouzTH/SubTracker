@@ -1,0 +1,22 @@
+# PostgreSQL local para desenvolvimento, sem instalar nada na máquina além
+# do Docker. Subir:  npm run db:up    Derrubar:  npm run db:down
+# (os dados ficam no volume "subtracker_pgdata" e sobrevivem a reinícios;
+# para apagar tudo e começar do zero: docker compose down -v)
+#
+# Os valores de usuário/senha/banco precisam bater com DATABASE_URL no .env.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: subtracker-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: subtracker
+      POSTGRES_PASSWORD: subtracker
+      POSTGRES_DB: subtracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - subtracker_pgdata:/var/lib/postgresql/data
+
+volumes:
+  subtracker_pgdata:

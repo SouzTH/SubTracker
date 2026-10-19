@@ -73,6 +73,10 @@ O build (`tsc` + Vite) é gerado na pasta `frontend/dist/`. O comando de preview
 SubTracker/
 ├── documentacao/          → Prototipagem, Refinamento, Manual e Cronograma
 ├── teste.csv               → extrato de exemplo para testar a importação
+├── shared/                 → pacote @subtracker/shared: schemas Zod e constantes de domínio
+│                              para o frontend e o backend (ver shared/README.md)
+├── backend/                → API real (Express + Prisma + PostgreSQL + JWT). Base para a etapa
+│                              seguinte: ainda NÃO está ligada ao frontend (ver backend/README.md)
 └── frontend/
     ├── db.json              → banco de dados simulado (utilizadores, subscrições, histórico)
     └── src/
@@ -105,7 +109,7 @@ A pasta [`documentacao/`](./documentacao) reúne:
 
 ## Limitações atuais
 
-* A autenticação é simulada: a sessão depende unicamente do registo local no navegador (`localStorage`), sem a emissão de um token JWT verdadeiro.
+* A autenticação é simulada: a sessão depende unicamente do registo local no navegador (`localStorage`), sem a emissão de um token JWT verdadeiro. A pasta `backend/` já traz a base de uma API com JWT e palavras-passe com hash, mas o frontend ainda usa o json-server.
 * As palavras-passe guardadas no `db.json` estão em texto limpo, para fins académicos de demonstração.
 * A recuperação de senha não envia email real — confirma o email na hora e já deixa redefinir a senha.
 * A importação de CSV depende da estrutura fixa (`data,descricao,valor`).
