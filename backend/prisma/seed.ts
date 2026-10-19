@@ -2,6 +2,7 @@
 // usuário manualmente só pra explorar a API. Os dados aqui são ilustrativos
 // (não é uma cópia do antigo frontend/db.json) — ajuste como quiser.
 // Rodar:  npm run seed   (pode rodar várias vezes: não duplica nada)
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 

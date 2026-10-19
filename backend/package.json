@@ -4,7 +4,7 @@
   "description": "API REST do SubTracker — Express + Prisma + PostgreSQL, autenticação JWT e validação com Zod compartilhado com o frontend.",
   "type": "commonjs",
   "scripts": {
-    "postinstall": "npm install --prefix ../shared",
+    "postinstall": "npm install --prefix ../shared && prisma generate",
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
@@ -37,5 +37,10 @@
     "@types/node": "^22.10.2",
     "prisma": "^5.22.0",
     "typescript": "^5.7.2"
+  },
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "esbuild@0.28.2": true
   }
 }
