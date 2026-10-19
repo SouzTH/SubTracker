@@ -31,6 +31,20 @@
         "Jogos": 80,
         "Outros": 50
       }
+    },
+    {
+      "nome": "Michael",
+      "email": "michael@gmail.com",
+      "password": "Leahcym1029384765.",
+      "id": "RYzREdBYBvM",
+      "budgets": {
+        "Streaming": 350,
+        "Trabalho": 350,
+        "Fitness": 100,
+        "Música": 30,
+        "Jogos": 80,
+        "Outros": 100
+      }
     }
   ],
   "subs": [
@@ -300,6 +314,34 @@
         }
       ],
       "id": "77uq_5MmGiM"
+    },
+    {
+      "userId": "RYzREdBYBvM",
+      "name": "Netflix",
+      "category": "Streaming",
+      "value": 24.45,
+      "period": "Mensal",
+      "nextCharge": "2026-10-19",
+      "paymentMethod": "Cartão de crédito",
+      "status": "Ativa",
+      "color": "#e50914",
+      "icon": "🎬",
+      "history": [],
+      "id": "EcmvOLb4pi4"
+    },
+    {
+      "userId": "RYzREdBYBvM",
+      "name": "Spotify",
+      "category": "Música",
+      "value": 445.978,
+      "period": "Mensal",
+      "nextCharge": "2026-10-19",
+      "paymentMethod": "Cartão de crédito",
+      "status": "Ativa",
+      "color": "#1db954",
+      "icon": "🎵",
+      "history": [],
+      "id": "Y7W6nDjDTPc"
     }
   ],
   "$schema": "./node_modules/json-server/schema.json"
