@@ -119,14 +119,15 @@ Abaixo estão as anotações explicativas numeradas para cada captura de tela an
 2. **Bloco de Informações Contratuais:** Grade com valor atual, periodicidade, data da próxima fatura e forma de pagamento cadastrada.
 3. **Card de Projeção Anual:** Exibe o custo total projetado daquele serviço específico em um período de 12 meses (R$ 526,80).
 4. **Lista de Histórico de Cobranças:** Registros cronológicos de pagamentos anteriores, com status (Pago), data de débito e valor cobrado.
-5. **Ações de Gestão (Pausar e Editar):** Botão para suspender temporariamente a assinatura (sem excluí-la) e botão para abrir a edição dos valores e datas.
+5. **Ações de Gestão (Pausar, Confirmar Pagamento e Editar):** Botão para suspender/reativar a assinatura (sem excluí-la), botão "Confirmar Pagamento" que registra a cobrança do ciclo atual no histórico e já calcula a próxima data, e botão para abrir a edição dos valores e datas.
 6. **Botão de Cancelamento Direto:** Botão em destaque "Cancelar no Provedor ↗" que redireciona o usuário diretamente para a página oficial de gerenciamento e cancelamento do serviço contratado.
+7. **Botão Excluir Assinatura (UC04):** Remove definitivamente o registro do sistema, após confirmação, para os casos em que o usuário prefere apagar em vez de apenas pausar.
 
 ### Tela 5: Relatório de Análise Financeira
 
 1. **Cards Consolidados de Topo:** Exibe o total mensal em vigor (R$ 491,60) e a estimativa de impacto anual consolidado de todas as assinaturas ativas (R$ 5.899,20).
 2. **Gráfico Donut por Categoria:** Gráfico circular acompanhado de legenda percentual dividindo o orçamento em Trabalho (66%), Fitness (18%), Streaming (11%) e Música (4%).
-3. **Ranking de Maiores Gastos:** Lista numerada dos serviços mais caros em ordem decrescente (1º Adobe Creative, 2º Academia Smart, 3º Netflix).
+3. **Ranking de Maiores Gastos:** Lista numerada dos serviços mais caros em ordem decrescente (1º Adobe Creative, 2º Academia, 3º Netflix).
 4. **Resumo Financeiro:** Linhas de auditoria comparando o gasto deste mês, a projeção para o mês seguinte e o cálculo anual.
 
 ### Tela 6: Importar Extrato (Envio de Arquivo)
@@ -141,4 +142,14 @@ Abaixo estão as anotações explicativas numeradas para cada captura de tela an
 - **Indicador de Arquivo Processado:** Exibe o nome do arquivo analisado ("Extrato de Teste - SubTr...") com selo de status "Analisado".
 - **Contador de Ocorrências:** Mostra a quantidade de assinaturas periódicas encontradas na fatura ("3 assinaturas encontradas na sua fatura").
 - **Lista de Seleção em Lote:** Cartões individuais com caixas de seleção (checkbox) para cada serviço detectado (Spotify, iCloud+, Canva Pro), apresentando a data de detecção, categoria sugerida e valor mensal.
-- **Botão Confirmar e Monitorar:** Persiste os serviços marcados no banco de dados e atualiza o Painel Principal.
+- **Botão Confirmar e Monitorar:** Persiste os serviços marcados no banco de dados e atualiza o Painel Principal. Quando o serviço detectado já corresponde a uma assinatura ativa existente, o sistema confirma o pagamento daquele ciclo em vez de cadastrar uma assinatura duplicada — cada item da lista é identificado com o selo "nova assinatura" ou "confirma pagamento" para deixar isso claro ao usuário.
+
+### Tela 8: Meu Perfil (implementa UC09, UC10 e UC11 — Teto Orçamentário)
+
+1. **Dados Pessoais:** Nome, telefone (opcional) e forma de pagamento padrão — guarda só um rótulo (ex.: "Cartão de crédito"), nunca dados reais de cartão, já que o sistema não processa pagamentos de verdade.
+2. **Metas por Categoria:** Um campo de valor (R$) para cada categoria (Streaming, Trabalho, Fitness, Música, Jogos, Outros), pré-preenchido com um valor padrão. Salvar aqui cadastra (UC09) ou atualiza (UC11) o teto orçamentário daquela categoria, que passa a alimentar as barras de progresso do Painel Principal (UC10).
+3. **Acesso:** Pelo avatar no cabeçalho do Painel Principal (mobile) ou pelo menu lateral (desktop).
+
+### Telas de Autenticação (suporte, fora do escopo original de 18 UCs)
+
+Como o sistema passou a isolar os dados por usuário (cada assinatura pertence a quem a cadastrou), foram adicionadas três telas de apoio que não faziam parte do levantamento original de casos de uso: **Login**, **Cadastro** e **Esqueci minha Senha**. Elas são pré-requisito técnico para o restante do sistema funcionar com múltiplos usuários, mas não substituem nem alteram nenhuma das 18 UCs documentadas acima.

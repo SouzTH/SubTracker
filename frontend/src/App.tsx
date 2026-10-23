@@ -1,4 +1,5 @@
-import { useState, useEffect, ReactNode } from "react";
+import { useState, ReactNode } from "react";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import Dashboard from "./screens/Dashboard";
 import AddSubscription from "./screens/AddSubscription";
 import SubscriptionDetails from "./screens/SubscriptionDetails";
@@ -10,6 +11,8 @@ import { Login } from './pages/Login/Login';
 import { Register } from './pages/Login/Cadastro';
 import { ForgotPassword } from './pages/Login/ForgotPassword';
 import EditSubscription from "./screens/EditSubscription";
+import { queryClient, subsQueryKey } from "./lib/queryClient";
+import { getSubsByUser } from "./lib/api";
 
 export type Screen = "dashboard" | "add" | "edit" | "details" | "report" | "import" | "profile";
 
@@ -63,7 +66,6 @@ function saveStoredUser(user: CurrentUser) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
 }
 
-// Correção: Uso de ReactNode em vez de JSX.Element para evitar o erro ts(2503)
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const user = localStorage.getItem(SESSION_KEY);
   if (!user) {
@@ -74,21 +76,23 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/cadastro" element={<Register />} />
-        <Route path="/esqueci-senha" element={<ForgotPassword />} />
-        <Route
-          path="/painel"
-          element={
-            <ProtectedRoute>
-              <Painel />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/cadastro" element={<Register />} />
+          <Route path="/esqueci-senha" element={<ForgotPassword />} />
+          <Route
+            path="/painel"
+            element={
+              <ProtectedRoute>
+                <Painel />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -96,25 +100,17 @@ function Painel() {
   const routerNavigate = useNavigate();
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
-
-  const [subs, setSubs] = useState<Subscription[]>([]);
   const [user, setUser] = useState<CurrentUser | null>(() => getStoredUser());
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // Busca apenas as assinaturas do utilizador com sessão iniciada.
-  useEffect(() => {
-    if (!user) return;
-    fetch(`http://localhost:3000/subs?userId=${user.id}`)
-      .then(response => response.json())
-      .then(data => setSubs(data))
-      .catch(error => console.error("Erro ao carregar dados:", error));
-  }, [user]);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  // TanStack Query cuida do fetch, do cache e do estado de carregamento das
+  // assinaturas — cada tela que precisa alterar dados invalida esta mesma
+  // chave (subsQueryKey) depois de uma mutação, em vez de recebermos um
+  // `setSubs` para atualizar manualmente.
+  const { data: subs = [] } = useQuery({
+    queryKey: subsQueryKey(user?.id),
+    queryFn: () => getSubsByUser(user!.id),
+    enabled: !!user,
+  });
 
   const navigate = (s: Screen, id?: any) => {
     setScreen(s);
@@ -122,9 +118,8 @@ function Painel() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem(SESSION_KEY); // Remove a sessão do navegador
-    setSubs([]); // <-- Limpa as assinaturas do ecrã
-    setUser(null); // <-- Limpa o utilizador da memória
+    localStorage.removeItem(SESSION_KEY);
+    setUser(null);
     routerNavigate('/');
   };
 
@@ -140,89 +135,49 @@ function Painel() {
   if (!user) return null;
 
   return (
-    <div style={{
-      display: "flex",
-      flexDirection: isMobile ? "column" : "row",
-      width: "100vw",
-      minHeight: "100vh",
-      background: "var(--background)"
-    }}>
+    <div className="flex flex-col md:flex-row w-screen min-h-screen bg-background">
 
-      {!isMobile && (
-        <aside style={{
-          width: "260px",
-          background: "rgba(8,14,29,0.95)",
-          borderRight: "1px solid rgba(255,255,255,0.06)",
-          display: "flex",
-          flexDirection: "column",
-          padding: "24px 16px",
-          justifyContent: "space-between",
-          height: "100vh",
-          position: "sticky",
-          top: 0
-        }}>
-          <div>
-            <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginBottom: "32px", paddingLeft: "12px" }}>
-              Sub<span style={{ color: "var(--primary, #00d4aa)" }}>Tracker</span>
-            </div>
-            <DesktopNav screen={screen} navigate={navigate} />
+      {/* Sidebar — só aparece a partir do breakpoint md (768px), via CSS puro */}
+      <aside className="hidden md:flex w-[260px] bg-[rgba(8,14,29,0.95)] border-r border-[rgba(255,255,255,0.06)] flex-col py-6 px-4 justify-between h-screen sticky top-0">
+        <div>
+          <div className="text-xl font-bold text-white mb-8 pl-3 font-heading">
+            Sub<span className="text-primary">Tracker</span>
           </div>
+          <DesktopNav screen={screen} navigate={navigate} />
+        </div>
 
-          <div style={{ padding: "12px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-            <p style={{
-              fontSize: "13px",
-              color: "var(--foreground, #fff)",
-              fontWeight: 600,
-              margin: "0 0 8px",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}>
-              {user.nome}
-            </p>
-            <button
-              onClick={handleLogout}
-              style={{ background: "none", border: "none", color: "var(--muted-foreground, #a1a1aa)", cursor: "pointer", fontSize: "14px", width: "100%", textAlign: "left" }}
-            >
-              Terminar Sessão
-            </button>
-          </div>
-        </aside>
-      )}
+        <div className="p-3 border-t border-[rgba(255,255,255,0.06)]">
+          <p className="text-[13px] text-foreground font-semibold mb-2 overflow-hidden text-ellipsis whitespace-nowrap font-body">
+            {user.nome}
+          </p>
+          <button
+            onClick={handleLogout}
+            className="bg-transparent border-none text-muted-foreground cursor-pointer text-sm w-full text-left hover:text-foreground transition-colors font-body"
+          >
+            Terminar Sessão
+          </button>
+        </div>
+      </aside>
 
-      <main style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        overflowY: "auto",
-        minHeight: "100vh",
-        paddingBottom: isMobile ? "80px" : "0"
-      }}>
-        <div style={{
-          width: "100%",
-          maxWidth: isMobile ? "100%" : "1200px",
-          margin: "0 auto",
-          padding: isMobile ? "16px" : "40px"
-        }}>
+      <main className="flex-1 flex flex-col overflow-y-auto min-h-screen pb-20 md:pb-0">
+        <div className="w-full max-w-full md:max-w-[1200px] mx-auto p-4 md:p-10">
           {screen === "dashboard" && (
-            <Dashboard subs={subs} navigate={navigate} budgets={user.budgets ?? DEFAULT_BUDGETS} />
+            <Dashboard subs={subs} navigate={navigate} budgets={user.budgets ?? DEFAULT_BUDGETS} userName={user.nome} />
           )}
           {screen === "add" && (
-            <AddSubscription subs={subs} setSubs={setSubs} navigate={navigate} />
+            <AddSubscription navigate={navigate} />
           )}
-
           {screen === "edit" && selectedSub && (
-            <EditSubscription sub={selectedSub as any} subs={subs} setSubs={setSubs} navigate={navigate} />
+            <EditSubscription sub={selectedSub as any} navigate={navigate} />
           )}
-          
           {screen === "details" && selectedSub && (
-            <SubscriptionDetails sub={selectedSub as any} subs={subs} setSubs={setSubs} navigate={navigate} />
+            <SubscriptionDetails sub={selectedSub as any} navigate={navigate} />
           )}
           {screen === "report" && (
             <Report subs={subs} navigate={navigate} />
           )}
           {screen === "import" && (
-            <ImportStatement subs={subs} setSubs={setSubs} navigate={navigate} />
+            <ImportStatement subs={subs} navigate={navigate} />
           )}
           {screen === "profile" && (
             <Profile user={user} onUserUpdate={handleUserUpdate} onLogout={handleLogout} navigate={navigate} />
@@ -230,9 +185,8 @@ function Painel() {
         </div>
       </main>
 
-      {isMobile && (
-        <BottomNav screen={screen} navigate={navigate} />
-      )}
+      {/* Bottom nav — só aparece ABAIXO do breakpoint md, via CSS puro */}
+      <BottomNav screen={screen} navigate={navigate} />
 
     </div>
   );
@@ -240,7 +194,7 @@ function Painel() {
 
 function DesktopNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen) => void }) {
   return (
-    <nav style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <nav className="flex flex-col gap-2">
       {[
         { key: "dashboard", icon: "⊞", label: "Dashboard" },
         { key: "report", icon: "◎", label: "Relatórios" },
@@ -253,24 +207,11 @@ function DesktopNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen
           <button
             key={item.key}
             onClick={() => navigate(item.key as Screen)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              background: active ? "rgba(0, 212, 170, 0.1)" : "transparent",
-              border: "none",
-              borderRadius: "12px",
-              cursor: "pointer",
-              padding: "12px 16px",
-              color: active ? "var(--primary, #00d4aa)" : "var(--muted-foreground, #a1a1aa)",
-              fontSize: "15px",
-              fontWeight: active ? 600 : 400,
-              transition: "0.2s",
-              width: "100%",
-              textAlign: "left"
-            }}
+            className={`flex items-center gap-3 border-none rounded-sm cursor-pointer py-3 px-4 text-[15px] w-full text-left transition-colors font-body ${
+              active ? "bg-primary/10 text-primary font-semibold" : "bg-transparent text-muted-foreground font-normal"
+            }`}
           >
-            <span style={{ fontSize: "18px" }}>{item.icon}</span>
+            <span className="text-lg">{item.icon}</span>
             <span>{item.label}</span>
           </button>
         );
@@ -281,22 +222,7 @@ function DesktopNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen
 
 function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen) => void }) {
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: "rgba(8,14,29,0.95)",
-        backdropFilter: "blur(16px)",
-        borderTop: "1px solid var(--border)",
-        display: "flex",
-        justifyContent: "space-around",
-        alignItems: "center",
-        padding: "12px 16px 20px",
-        zIndex: 50,
-      }}
-    >
+    <div className="flex md:hidden fixed bottom-0 left-0 right-0 bg-[rgba(8,14,29,0.95)] backdrop-blur-[16px] border-t border-border justify-around items-center pt-3 px-4 pb-5 z-50">
       {[
         { key: "dashboard", icon: "⊞", label: "Início" },
         { key: "add", icon: "+", label: "Adicionar" },
@@ -314,23 +240,10 @@ function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen)
             <button
               key={item.key}
               onClick={() => navigate(item.key as Screen)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                background: "var(--primary)",
-                color: "#080e1d",
-                border: "none",
-                borderRadius: "24px",
-                padding: "10px 20px",
-                cursor: "pointer",
-                boxShadow: "0 4px 12px rgba(0,212,170,0.3)",
-              }}
+              className="flex items-center gap-1.5 bg-primary text-primary-foreground border-none rounded-xl py-2.5 px-5 cursor-pointer shadow-[0_4px_12px_rgba(0,212,170,0.3)]"
             >
-              <span style={{ fontSize: "20px", fontWeight: "bold" }}>{item.icon}</span>
-              <span style={{ fontSize: "14px", fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
-                {item.label}
-              </span>
+              <span className="text-xl font-bold">{item.icon}</span>
+              <span className="text-sm font-bold font-body">{item.label}</span>
             </button>
           );
         }
@@ -339,21 +252,12 @@ function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen)
           <button
             key={item.key}
             onClick={() => navigate(item.key as Screen)}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "4px",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "4px 12px",
-              color: active ? "var(--primary)" : "var(--muted-foreground)",
-              transition: "color 0.2s",
-            }}
+            className={`flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-3 transition-colors ${
+              active ? "text-primary" : "text-muted-foreground"
+            }`}
           >
-            <span style={{ fontSize: "20px", lineHeight: 1 }}>{item.icon}</span>
-            <span style={{ fontSize: "11px", fontFamily: "Inter, sans-serif", fontWeight: active ? 600 : 400 }}>
+            <span className="text-xl leading-none">{item.icon}</span>
+            <span className={`text-[11px] font-body ${active ? "font-semibold" : "font-normal"}`}>
               {item.label}
             </span>
           </button>

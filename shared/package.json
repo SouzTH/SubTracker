@@ -1,0 +1,17 @@
+{
+  "name": "@subtracker/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Schemas Zod e constantes de domínio compartilhados entre o frontend e o backend do SubTracker.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

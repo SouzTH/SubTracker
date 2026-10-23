@@ -4,7 +4,7 @@
 - Ronald Teixeira de Assis
 - Rodrigo Américo Nascimento D'icarahy
 - Thiago Souza da Silva
-- Matheus Jasbick
+- Matheus Jasbick *(trancou matrícula durante o semestre — ver nota de escopo na Seção 4)*
 
 ## 1. Matriz CRUD (Validação da Consistência dos Requisitos)
 
@@ -108,5 +108,24 @@ A ordenação prioriza primeiro as funcionalidades onde o valor direto para o cl
 - **Matheus Jasbick**
   - Entidade de Foco: Teto Orçamentário
   - Casos de Uso: UC09, UC10, UC11 e UC12
+  - *Trancou a matrícula durante o desenvolvimento. Conforme orientação do professor em sala, o grupo optou por não simplesmente remover a parte dele do sistema (o que comprometeria a coesão, já que a prototipagem documentada acima foi majoritariamente trabalho dele), e sim redistribuir e reduzir escopo onde fazia sentido — ver Seção 4.*
+
+## 4. Status de Implementação e Justificativas de Escopo
+
+Em atendimento ao critério de entrega que pede justificativa textual para qualquer parte do escopo prometido que não tenha sido implementada, segue o status de cada caso de uso na versão final do sistema:
+
+| Caso de Uso | Status | Observação |
+|---|---|---|
+| UC01–UC04 (Assinatura) | ✅ Implementado | Inclui também "Confirmar Pagamento", recurso que não estava no desenho original e foi incorporado durante o desenvolvimento. |
+| UC09, UC10, UC11 (Teto Orçamentário) | ✅ Implementado | Eram de responsabilidade do Matheus. Foram absorvidas pelo restante da equipe na tela "Meu Perfil" (Tela 8 da Prototipagem) após a saída dele. |
+| UC12 (Excluir Teto Orçamentário) | ⚠️ Não aplicável como exclusão literal | As seis categorias (Streaming, Trabalho, Fitness, Música, Jogos, Outros) são fixas no domínio do sistema — não existe "assinatura sem categoria". Zerar o valor da meta (ajustar para R$ 0,00) cumpre a mesma função prática de "remover o limite" sem deixar a categoria num estado inconsistente. |
+| UC13, UC14 (Upload e Conciliação de Extrato) | ✅ Implementado | Suporta `.csv`; cruza automaticamente com o catálogo de serviços e confirma pagamento em vez de duplicar quando a assinatura já existe. |
+| UC05, UC07, UC08 (Cadastrar/Atualizar/Excluir Serviço — perfil Administrador) | ❌ Não implementado | Eram atribuídas ao Thiago junto com UC06 e UC18. Com a redução de equipe (4 → 3 integrantes) e a orientação do professor para reduzir escopo nesse cenário, o grupo optou por manter o catálogo de serviços como uma lista mantida no código-fonte (`src/constants/catalog.ts`) em vez de construir uma área administrativa completa com persistência via CRUD. O usuário final ainda consegue cadastrar um serviço fora do catálogo através da opção "Outro" (parte da UC06, que segue implementada). |
+| UC15 (Consultar Histórico de Extratos) | ❌ Não implementado | Já estava classificada como "Prioridade Básica" na Seção 3 deste documento. O sistema guarda o resultado de cada importação (as assinaturas criadas/confirmadas), mas não um log separado de "quais arquivos já foram importados e quando". |
+| UC16 (Descartar Lançamento de Extrato) | ❌ Não implementado | Mesma priorização básica da Seção 3. Hoje, desmarcar um item na tela de conciliação evita criá-lo naquela importação, mas não impede que ele volte a aparecer numa importação futura. |
+| UC17 (Relatório) | ✅ Implementado | Gráfico donut por categoria, ranking de maiores gastos e projeção mensal/anual. |
+| UC18 (Link de Cancelamento) | ✅ Implementado | Por ser somente leitura sobre a entidade Assinatura (ver Matriz CRUD), não exigiu nenhuma estrutura de dados adicional. |
+
+**Resumo:** das 18 UCs originais, 13 foram implementadas. As 5 não implementadas (UC05, UC07 e UC08, do perfil Administrador sobre a entidade Serviço; UC15 e UC16, de auditoria sobre a entidade Extrato Importado) são justamente as de menor prioridade segundo a própria Seção 3 deste documento — e sua omissão foi ainda reforçada pela orientação do professor para reduzir escopo em função da saída de um integrante da equipe.
 
 **Link do repositório:** [https://github.com/SouzTH/SubTracker](https://github.com/SouzTH/SubTracker)
