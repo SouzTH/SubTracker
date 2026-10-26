@@ -2,13 +2,13 @@
 
 Repositório: https://github.com/SouzTH/SubTracker
 
-A nota de cada aluno é a parte comum do grupo mais a qualidade individual. Sem autoria efetiva na própria parte, a AV1 fica 0. A parte comum vale 60 pontos: stack da disciplina (30) e escopo funcionando (30). Os 40 restantes avaliam a qualidade do que o próprio aluno fez.
+A nota de cada aluno é a parte comum do grupo mais a qualidade individual. Quem não tem commit no aplicativo recebe a parte comum do grupo, sem a parte individual. A parte comum vale 60 pontos: stack da disciplina (30) e escopo funcionando (30). Os 40 restantes avaliam a qualidade do que o próprio aluno fez.
 
 | Aluno | Nota |
 | --- | ---: |
 | Thiago Souza da Silva | 96 |
 | Ronald Teixeira de Assis | 96 |
-| Rodrigo Americo Nascimento D'Icarahy | 0 |
+| Rodrigo Americo Nascimento D'Icarahy | 60 |
 | Matheus Jasbick Conceicao Machado | 0 |
 
 ## Parte comum — 60/60
@@ -54,10 +54,10 @@ Desconto na parte individual:
 - 2 pontos. O commit `dd1f287` coloca estilo direto na cor e no degradê em `SubscriptionDetails.tsx`, `Dashboard.tsx`, `Report.tsx`, `ImportStatement.tsx` e `EditSubscription.tsx`.
 - 2 pontos. `frontend/src/screens/ImportStatement.tsx` acrescenta o lançamento ao histórico sempre que a linha casa com uma assinatura já existente. Depois da importação, a Netflix do `admin1` tinha o pagamento de 05/09/2026 repetido no histórico.
 
-## Rodrigo Americo Nascimento D'Icarahy — 0
+## Rodrigo Americo Nascimento D'Icarahy — 60
 
-O único commit no nome dele é `185f198`, "corrigindo README", autor Ramerico11, e-mail `rodsamerico2005@gmail.com`. O diff tem três linhas no `README.md`. A tela de extrato, que o refinamento atribui a ele, está no commit inicial do Thiago e no motor de importação do Ronald. A AV1 fica 0.
+O único commit no nome dele é `185f198`, "corrigindo README", autor Ramerico11, e-mail `rodsamerico2005@gmail.com`. O diff tem três linhas no `README.md`. A tela de extrato, que o refinamento atribui a ele, está no commit inicial do Thiago e no motor de importação do Ronald. A nota é a parte comum do grupo, 60 pontos. Sem commit no aplicativo, não há parte individual a avaliar.
 
 ## Matheus Jasbick Conceicao Machado — 0
 
-Não há commit no nome dele. O refinamento registra que ele trancou e que os tetos ficaram com a equipe. A meta que a correção gravou está no perfil implementado pelo Ronald. A AV1 fica 0, e a linha pode sair da turma.
+Não há commit no nome dele. O refinamento registra que ele trancou a disciplina e que os tetos ficaram com a equipe. A meta que a correção gravou está no perfil implementado pelo Ronald. Com o trancamento, a AV1 fica 0.
