@@ -12,6 +12,4 @@ export function signToken(payload: TokenPayload): string {
   return jwt.sign(payload, env.jwtSecret, { expiresIn });
 }
 
-export function verifyToken(token: string): TokenPayload {
-  return jwt.verify(token, env.jwtSecret) as TokenPayload;
-}
+// A validação do token é feita pelo Passport (lib/passport.ts).

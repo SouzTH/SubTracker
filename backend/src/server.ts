@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import { env } from "./lib/env";
+import passport from "./lib/passport";
 import { errorHandler } from "./middleware/errorHandler";
 import routes from "./routes";
 
@@ -8,6 +9,7 @@ const app = express();
 
 app.use(cors({ origin: env.frontendUrl }));
 app.use(express.json());
+app.use(passport.initialize());
 
 // Health check simples — útil pra confirmar que o servidor está de pé
 // antes de testar qualquer rota autenticada.

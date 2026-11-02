@@ -1,6 +1,13 @@
-import { loginSchema, registerSchema, updateProfileSchema } from "@subtracker/shared";
+
+import {
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  updateProfileSchema,
+} from "@subtracker/shared";
 import bcrypt from "bcryptjs";
 import type { Request, Response } from "express";
+import { env } from "../lib/env";
 import { signToken } from "../lib/jwt";
 import { getUserId } from "../middleware/auth";
 import { repositories } from "../repositories";
@@ -26,28 +33,44 @@ export async function register(req: Request, res: Response) {
   }
 
   const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
-  const user = await repositories.users.create({ nome: data.nome, email, passwordHash });
+  const user = await repositories.users.create({
+    nome: data.nome,
+    email,
+    passwordHash,
+  });
 
-  res.status(201).json({ token: signToken({ userId: user.id }), user: toPublicUser(user) });
+  res.status(201).json({
+    token: signToken({ userId: user.id }),
+    user: toPublicUser(user),
+  });
 }
 
 // POST /api/auth/login
 export async function login(req: Request, res: Response) {
   const data = loginSchema.parse(req.body);
 
-  const user = await repositories.users.findByEmail(normalizeEmail(data.email));
-  const passwordMatches = await bcrypt.compare(data.password, user?.passwordHash ?? DUMMY_HASH);
+  const user = await repositories.users.findByEmail(
+    normalizeEmail(data.email)
+  );
+  const passwordMatches = await bcrypt.compare(
+    data.password,
+    user?.passwordHash ?? DUMMY_HASH
+  );
 
   if (!user || !passwordMatches) {
     throw new AppError("E-mail ou senha incorretos.", 401);
   }
 
-  res.json({ token: signToken({ userId: user.id }), user: toPublicUser(user) });
+  res.json({
+    token: signToken({ userId: user.id }),
+    user: toPublicUser(user),
+  });
 }
 
 // GET /api/auth/me
 export async function me(req: Request, res: Response) {
   const user = await repositories.users.findById(getUserId(req));
+
   if (!user) {
     throw new AppError("Usuário não encontrado.", 404);
   }
@@ -60,9 +83,43 @@ export async function updateMe(req: Request, res: Response) {
   const patch = updateProfileSchema.parse(req.body);
 
   const user = await repositories.users.update(getUserId(req), patch);
+
   if (!user) {
     throw new AppError("Usuário não encontrado.", 404);
   }
 
   res.json(toPublicUser(user));
+}
+
+// POST /api/auth/reset-password
+export async function resetPassword(req: Request, res: Response) {
+  // Verifica se a redefinição demonstrativa está habilitada.
+  if (!env.enableDemoPasswordReset) {
+    throw new AppError(
+      "Redefinição de senha demonstrativa desabilitada.",
+      404
+    );
+  }
+
+  const data = resetPasswordSchema.parse(req.body);
+  const email = normalizeEmail(data.email);
+
+  const user = await repositories.users.findByEmail(email);
+
+  if (!user) {
+    throw new AppError("Usuário não encontrado.", 404);
+  }
+
+  const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
+
+  const updatedUser = await repositories.users.updatePassword(
+    user.id,
+    passwordHash
+  );
+
+  if (!updatedUser) {
+    throw new AppError("Usuário não encontrado.", 404);
+  }
+
+  res.json({ message: "Senha redefinida com sucesso." });
 }

@@ -7,6 +7,7 @@ export const loginSchema = z.object({
   email: emailField,
   password: z.string().min(1, "Informe a senha"),
 });
+
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export const registerSchema = z.object({
@@ -16,4 +17,14 @@ export const registerSchema = z.object({
     .string()
     .min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`),
 });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const resetPasswordSchema = z.object({
+  email: emailField,
+  password: z
+    .string()
+    .min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`),
+});
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

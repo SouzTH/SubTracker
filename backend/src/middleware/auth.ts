@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { verifyToken } from "../lib/jwt";
+import passport from "../lib/passport";
 import { AppError } from "../utils/AppError";
 
 // Estende o tipo Request do Express para incluir o usuário autenticado,
@@ -14,28 +14,36 @@ declare global {
 }
 
 /**
- * Exige um header "Authorization: Bearer <token>" válido. Em caso de
- * sucesso, popula `req.userId` para as rotas usarem. Qualquer rota que
- * leia ou altere dados de um usuário deve passar por este middleware —
- * é o que garante o isolamento entre contas (equivalente ao filtro por
- * `userId` que o frontend já fazia manualmente contra o json-server).
+ * Exige um header "Authorization: Bearer <token>" válido, validado pelo
+ * Passport (estratégia JWT, ver lib/passport.ts). Em caso de sucesso, popula
+ * `req.userId` para as rotas usarem. Qualquer rota que leia ou altere dados
+ * de um usuário deve passar por este middleware — é o que garante o
+ * isolamento entre contas.
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const header = req.headers.authorization;
-  const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
-
-  if (!token) {
-    res.status(401).json({ error: "Token de autenticação ausente." });
-    return;
-  }
-
-  try {
-    const payload = verifyToken(token);
-    req.userId = payload.userId;
-    next();
-  } catch {
-    res.status(401).json({ error: "Token inválido ou expirado. Faça login novamente." });
-  }
+  // Callback próprio para manter o formato de erro { error } da API
+  // (o padrão do Passport responderia só "Unauthorized").
+  passport.authenticate(
+    "jwt",
+    { session: false },
+    (err: unknown, user: { userId: string } | false, info?: Error) => {
+      if (err) {
+        next(err);
+        return;
+      }
+      if (!user) {
+        const ausente = info?.message === "No auth token";
+        res.status(401).json({
+          error: ausente
+            ? "Token de autenticação ausente."
+            : "Token inválido ou expirado. Faça login novamente.",
+        });
+        return;
+      }
+      req.userId = user.userId;
+      next();
+    },
+  )(req, res, next);
 }
 
 /**

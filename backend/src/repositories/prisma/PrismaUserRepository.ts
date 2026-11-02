@@ -9,18 +9,27 @@ export class PrismaUserRepository implements UserRepository {
   constructor(private readonly db: PrismaClient) {}
 
   async findById(id: string): Promise<User | null> {
-    const row = await this.db.user.findUnique({ where: { id }, include: WITH_BUDGETS });
+    const row = await this.db.user.findUnique({
+      where: { id },
+      include: WITH_BUDGETS,
+    });
     return row ? toUser(row) : null;
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const row = await this.db.user.findUnique({ where: { email }, include: WITH_BUDGETS });
+    const row = await this.db.user.findUnique({
+      where: { email },
+      include: WITH_BUDGETS,
+    });
     return row ? toUser(row) : null;
   }
 
   async create(data: NewUser): Promise<User> {
     try {
-      const row = await this.db.user.create({ data, include: WITH_BUDGETS });
+      const row = await this.db.user.create({
+        data,
+        include: WITH_BUDGETS,
+      });
       return toUser(row);
     } catch (error) {
       // Cobre a corrida em que dois cadastros com o mesmo e-mail passam
@@ -32,9 +41,35 @@ export class PrismaUserRepository implements UserRepository {
     }
   }
 
-  async update(id: string, patch: UpdateProfileInput): Promise<User | null> {
+  async update(
+    id: string,
+    patch: UpdateProfileInput
+  ): Promise<User | null> {
     try {
-      const row = await this.db.user.update({ where: { id }, data: patch, include: WITH_BUDGETS });
+      const row = await this.db.user.update({
+        where: { id },
+        data: patch,
+        include: WITH_BUDGETS,
+      });
+      return toUser(row);
+    } catch (error) {
+      if (isRecordNotFound(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async updatePassword(
+    id: string,
+    passwordHash: string
+  ): Promise<User | null> {
+    try {
+      const row = await this.db.user.update({
+        where: { id },
+        data: { passwordHash },
+        include: WITH_BUDGETS,
+      });
       return toUser(row);
     } catch (error) {
       if (isRecordNotFound(error)) {
