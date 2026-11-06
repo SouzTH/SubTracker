@@ -9,52 +9,53 @@ import {
     resetPasswordSchema,
     ResetPasswordFormValues,
 } from '../../schemas/auth';
-import { findUsersByEmail, updateUser, ApiError } from '../../lib/api';
-
-// NOTA IMPORTANTE: este é um fluxo SIMPLIFICADO, adequado para o protótipo local.
-// Um sistema real nunca deixaria trocar a senha só por saber o email — o certo
-// seria enviar um link/token de uso único por email e validar esse token antes
-// de aceitar a nova senha. Como não temos um servidor de email aqui, pedimos a
-// confirmação do email e deixamos definir a nova senha na hora.
+import { ApiError, resetPasswordDemo } from '../../lib/api';
 
 export function ForgotPassword() {
     const navigate = useNavigate();
-    const [userId, setUserId] = useState<string | null>(null);
+    const [emailForReset, setEmailForReset] = useState<string | null>(null);
 
     const emailForm = useForm<ForgotEmailFormValues>({ resolver: zodResolver(forgotEmailSchema) });
     const resetForm = useForm<ResetPasswordFormValues>({ resolver: zodResolver(resetPasswordSchema) });
 
-    const findEmailMutation = useMutation({
-        mutationFn: async ({ email }: ForgotEmailFormValues) => {
-            const users = await findUsersByEmail(email);
-            const match = users.find((u) => u.email === email);
-            if (!match) throw new ApiError('Não encontramos nenhuma conta com este email.');
-            return match;
-        },
-        onSuccess: (match) => setUserId(match.id),
-        onError: (error) => {
-            emailForm.setError('root', {
-                message: error instanceof ApiError ? error.message : 'Erro de conexão ao servidor.',
-            });
-        },
-    });
+    const goToPasswordStep = (values: ForgotEmailFormValues) => {
+        setEmailForReset(values.email.trim().toLowerCase());
+        resetForm.reset({
+            novaSenha: '',
+            confirmarSenha: '',
+        });
+        emailForm.clearErrors();
+    };
 
     const resetPasswordMutation = useMutation({
-        mutationFn: (values: ResetPasswordFormValues) => updateUser(userId!, { password: values.novaSenha }),
-        onSuccess: () => setTimeout(() => navigate('/'), 1600),
-        onError: () => {
-            resetForm.setError('root', { message: 'Não foi possível atualizar a senha. Tente novamente.' });
+        mutationFn: async (values: ResetPasswordFormValues) => {
+            if (!emailForReset) {
+                throw new ApiError('E-mail não informado.');
+            }
+
+            return resetPasswordDemo({
+                email: emailForReset,
+                password: values.novaSenha,
+            });
+        },
+        onSuccess: () => {
+            setTimeout(() => navigate('/'), 1600);
+        },
+        onError: (error) => {
+            resetForm.setError('root', {
+                message: error instanceof ApiError ? error.message : 'Não foi possível atualizar a senha. Tente novamente.',
+            });
         },
     });
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-background px-4">
             <main className="w-full max-w-[380px] bg-card border border-border rounded-xl p-8">
-                {!userId && (
-                    <form onSubmit={emailForm.handleSubmit((v) => findEmailMutation.mutate(v))} noValidate>
+                {!emailForReset && (
+                    <form onSubmit={emailForm.handleSubmit(goToPasswordStep)} noValidate>
                         <h1 className="font-heading font-bold text-2xl text-center mb-2">Recuperar Senha</h1>
                         <p className="text-center text-[13px] text-muted-foreground font-body mb-6">
-                            Informe o email da sua conta para definir uma nova senha.
+                            Informe o e-mail da sua conta para redefinir a senha no modo demonstrativo.
                         </p>
 
                         {emailForm.formState.errors.root && (
@@ -82,10 +83,9 @@ export function ForgotPassword() {
 
                         <button
                             type="submit"
-                            disabled={findEmailMutation.isPending}
                             className="w-full mt-4 py-3 rounded-md border-none bg-primary text-primary-foreground font-heading font-bold text-sm cursor-pointer disabled:opacity-60"
                         >
-                            {findEmailMutation.isPending ? 'Buscando...' : 'Continuar'}
+                            Continuar
                         </button>
 
                         <p className="text-center mt-6 text-sm font-body">
@@ -100,11 +100,11 @@ export function ForgotPassword() {
                     </form>
                 )}
 
-                {userId && !resetPasswordMutation.isSuccess && (
+                {emailForReset && !resetPasswordMutation.isSuccess && (
                     <form onSubmit={resetForm.handleSubmit((v) => resetPasswordMutation.mutate(v))} noValidate>
                         <h1 className="font-heading font-bold text-2xl text-center mb-2">Nova Senha</h1>
                         <p className="text-center text-[13px] text-muted-foreground font-body mb-6">
-                            Conta encontrada! Defina sua nova senha.
+                            Defina a nova senha para <span className="font-semibold">{emailForReset}</span>.
                         </p>
 
                         {resetForm.formState.errors.root && (

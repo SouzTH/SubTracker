@@ -43,4 +43,20 @@ export class PrismaUserRepository implements UserRepository {
       throw error;
     }
   }
+
+  async resetPassword(id: string, passwordHash: string): Promise<User | null> {
+    try {
+      const row = await this.db.user.update({
+        where: { id },
+        data: { passwordHash },
+        include: WITH_BUDGETS,
+      });
+      return toUser(row);
+    } catch (error) {
+      if (isRecordNotFound(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
 }

@@ -1,6 +1,12 @@
-import { loginSchema, registerSchema, updateProfileSchema } from "@subtracker/shared";
+import {
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  updateProfileSchema,
+} from "@subtracker/shared";
 import bcrypt from "bcryptjs";
 import type { Request, Response } from "express";
+import { env } from "../lib/env";
 import { signToken } from "../lib/jwt";
 import { getUserId } from "../middleware/auth";
 import { repositories } from "../repositories";
@@ -65,4 +71,31 @@ export async function updateMe(req: Request, res: Response) {
   }
 
   res.json(toPublicUser(user));
+}
+
+// POST /api/auth/reset-password — fluxo demonstrativo para redefinir a senha.
+// Requer FLAG ENABLE_DEMO_PASSWORD_RESET="true" no backend.
+export async function resetPassword(req: Request, res: Response) {
+  if (!env.enableDemoPasswordReset) {
+    throw new AppError("A recuperação demonstrativa de senha está desabilitada.", 403);
+  }
+
+  const data = resetPasswordSchema.parse(req.body);
+  const email = normalizeEmail(data.email);
+
+  const user = await repositories.users.findByEmail(email);
+  if (!user) {
+    throw new AppError("Não encontramos nenhuma conta com este e-mail.", 404);
+  }
+
+  const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
+  const updated = await repositories.users.resetPassword(user.id, passwordHash);
+  if (!updated) {
+    throw new AppError("Não foi possível atualizar a senha.", 404);
+  }
+
+  res.json({
+    ok: true,
+    message: "Senha redefinida com sucesso. Esta funcionalidade é demonstrativa.",
+  });
 }

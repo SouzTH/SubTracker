@@ -25,4 +25,6 @@ export const env = {
   jwtSecret: required("JWT_SECRET"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
   frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
+  enableDemoPasswordReset:
+    (process.env.ENABLE_DEMO_PASSWORD_RESET ?? "false").trim().toLowerCase() === "true",
 };

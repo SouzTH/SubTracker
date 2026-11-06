@@ -144,7 +144,6 @@ export default function ImportStatement({ navigate, subs }: Props) {
         } else {
           // Novo: cria a assinatura com as datas reais detectadas no extrato.
           await createSub({
-            userId: user.id,
             name: d.name,
             icon: d.icon,
             color: d.color,

@@ -17,3 +17,24 @@ export const registerSchema = z.object({
     .min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const forgotEmailSchema = z.object({
+  email: emailField,
+});
+export type ForgotEmailInput = z.infer<typeof forgotEmailSchema>;
+
+export const resetPasswordSchema = z
+  .object({
+    email: emailField,
+    password: z.string().min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`).optional(),
+    novaSenha: z.string().min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`).optional(),
+  })
+  .refine((data) => Boolean(data.password ?? data.novaSenha), {
+    message: "Informe a nova senha",
+    path: ["password"],
+  })
+  .transform((data) => ({
+    email: data.email,
+    password: data.password ?? data.novaSenha ?? "",
+  }));
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

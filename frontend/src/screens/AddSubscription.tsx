@@ -50,8 +50,7 @@ export default function AddSubscription({ navigate }: Props) {
   const saveMutation = useMutation({
     mutationFn: (values: SubscriptionFormValues) => {
       if (!selected || !user) throw new ApiError("Sessão expirada. Faça login novamente.");
-      const payload: Omit<Subscription, "id"> = {
-        userId: user.id,
+      const payload: Omit<Subscription, "id" | "userId"> = {
         name: selected.name,
         category: values.category,
         value: values.value,

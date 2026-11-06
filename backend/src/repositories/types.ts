@@ -62,6 +62,8 @@ export interface UserRepository {
   create(data: NewUser): Promise<User>;
   /** Devolve null se o usuário não existir mais. */
   update(id: string, patch: UpdateProfileInput): Promise<User | null>;
+  /** Atualiza somente a senha do usuário após reset demonstrativo. */
+  resetPassword(id: string, passwordHash: string): Promise<User | null>;
 }
 
 // Todos os métodos recebem `userId`: o isolamento entre contas é
