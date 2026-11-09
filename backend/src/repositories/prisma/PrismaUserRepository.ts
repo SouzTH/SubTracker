@@ -60,10 +60,7 @@ export class PrismaUserRepository implements UserRepository {
     }
   }
 
-  async updatePassword(
-    id: string,
-    passwordHash: string
-  ): Promise<User | null> {
+  async resetPassword(id: string, passwordHash: string): Promise<User | null> {
     try {
       const row = await this.db.user.update({
         where: { id },

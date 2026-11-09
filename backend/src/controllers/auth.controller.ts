@@ -1,4 +1,3 @@
-
 import {
   loginSchema,
   registerSchema,
@@ -91,35 +90,32 @@ export async function updateMe(req: Request, res: Response) {
   res.json(toPublicUser(user));
 }
 
-// POST /api/auth/reset-password
+// POST /api/auth/reset-password — fluxo demonstrativo para redefinir a senha.
+// Requer FLAG ENABLE_DEMO_PASSWORD_RESET="true" no backend.
 export async function resetPassword(req: Request, res: Response) {
-  // Verifica se a redefinição demonstrativa está habilitada.
   if (!env.enableDemoPasswordReset) {
-    throw new AppError(
-      "Redefinição de senha demonstrativa desabilitada.",
-      404
-    );
+    throw new AppError("A recuperação demonstrativa de senha está desabilitada.", 403);
   }
 
   const data = resetPasswordSchema.parse(req.body);
   const email = normalizeEmail(data.email);
 
   const user = await repositories.users.findByEmail(email);
-
   if (!user) {
-    throw new AppError("Usuário não encontrado.", 404);
+    throw new AppError("Não encontramos nenhuma conta com este e-mail.", 404);
   }
 
   const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
-
-  const updatedUser = await repositories.users.updatePassword(
+  const updated = await repositories.users.resetPassword(
     user.id,
     passwordHash
   );
-
-  if (!updatedUser) {
-    throw new AppError("Usuário não encontrado.", 404);
+  if (!updated) {
+    throw new AppError("Não foi possível atualizar a senha.", 404);
   }
 
-  res.json({ message: "Senha redefinida com sucesso." });
+  res.json({
+    ok: true,
+    message: "Senha redefinida com sucesso. Esta funcionalidade é demonstrativa.",
+  });
 }

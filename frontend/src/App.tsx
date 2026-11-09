@@ -1,4 +1,4 @@
-import { useState, ReactNode } from "react";
+import { useState, ReactNode, useEffect } from "react";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import Dashboard from "./screens/Dashboard";
 import AddSubscription from "./screens/AddSubscription";
@@ -12,7 +12,14 @@ import { Register } from './pages/Login/Cadastro';
 import { ForgotPassword } from './pages/Login/ForgotPassword';
 import EditSubscription from "./screens/EditSubscription";
 import { queryClient, subsQueryKey } from "./lib/queryClient";
-import { getSubsByUser } from "./lib/api";
+import {
+  clearSession,
+  getCurrentUser,
+  getStoredToken,
+  getStoredUser as readStoredUser,
+  getSubsByUser,
+  saveSession,
+} from "./lib/api";
 
 export type Screen = "dashboard" | "add" | "edit" | "details" | "report" | "import" | "profile";
 
@@ -54,12 +61,7 @@ export interface CurrentUser {
 const SESSION_KEY = "subtracker_user";
 
 export function getStoredUser(): CurrentUser | null {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as CurrentUser) : null;
-  } catch {
-    return null;
-  }
+  return readStoredUser();
 }
 
 function saveStoredUser(user: CurrentUser) {
@@ -67,10 +69,110 @@ function saveStoredUser(user: CurrentUser) {
 }
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const user = localStorage.getItem(SESSION_KEY);
-  if (!user) {
+  const [isChecking, setIsChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function validateSession() {
+      const token = getStoredToken();
+      const storedUser = readStoredUser();
+
+      if (!token || !storedUser) {
+        clearSession();
+        if (!cancelled) {
+          setIsAuthenticated(false);
+          setIsChecking(false);
+        }
+        return;
+      }
+
+      try {
+        const currentUser = await getCurrentUser();
+        if (cancelled) return;
+
+        saveSession(token, currentUser);
+        setIsAuthenticated(true);
+      } catch {
+        if (!cancelled) {
+          clearSession();
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsChecking(false);
+        }
+      }
+    }
+
+    validateSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (isChecking) {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-foreground font-body">Validando sessão...</div>;
+  }
+
+  if (!isAuthenticated) {
     return <Navigate to="/" replace />;
   }
+
+  return <>{children}</>;
+}
+
+function PublicRoute({ children }: { children: ReactNode }) {
+  const [isChecking, setIsChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function validateSession() {
+      const token = getStoredToken();
+      if (!token) {
+        if (!cancelled) {
+          setIsAuthenticated(false);
+          setIsChecking(false);
+        }
+        return;
+      }
+
+      try {
+        const currentUser = await getCurrentUser();
+        if (cancelled) return;
+        saveSession(token, currentUser);
+        setIsAuthenticated(true);
+      } catch {
+        if (!cancelled) {
+          clearSession();
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsChecking(false);
+        }
+      }
+    }
+
+    validateSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (isChecking) {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-foreground font-body">Carregando...</div>;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/painel" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -79,9 +181,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/cadastro" element={<Register />} />
-          <Route path="/esqueci-senha" element={<ForgotPassword />} />
+          <Route path="/" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/cadastro" element={<PublicRoute><Register /></PublicRoute>} />
+          <Route path="/esqueci-senha" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
           <Route
             path="/painel"
             element={
@@ -102,13 +204,31 @@ function Painel() {
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const [user, setUser] = useState<CurrentUser | null>(() => getStoredUser());
 
+  useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+        setUser(currentUser);
+        return currentUser;
+      } catch {
+        clearSession();
+        setUser(null);
+        routerNavigate("/");
+        return null;
+      }
+    },
+    enabled: !!getStoredToken(),
+  });
+
   // TanStack Query cuida do fetch, do cache e do estado de carregamento das
   // assinaturas — cada tela que precisa alterar dados invalida esta mesma
   // chave (subsQueryKey) depois de uma mutação, em vez de recebermos um
   // `setSubs` para atualizar manualmente.
   const { data: subs = [] } = useQuery({
     queryKey: subsQueryKey(user?.id),
-    queryFn: () => getSubsByUser(user!.id),
+    queryFn: () => getSubsByUser(),
     enabled: !!user,
   });
 
@@ -118,7 +238,8 @@ function Painel() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem(SESSION_KEY);
+    clearSession();
+    queryClient.clear();
     setUser(null);
     routerNavigate('/');
   };

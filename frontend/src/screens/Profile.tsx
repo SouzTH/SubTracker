@@ -1,9 +1,9 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
+import { personalInfoSchema, budgetsSchema, type PersonalInfoInput, type BudgetsInput } from "@subtracker/shared";
 import { CurrentUser, CategoryBudgets, DEFAULT_BUDGETS, Screen } from "../App";
-import { personalInfoSchema, PersonalInfoFormValues, budgetsSchema, BudgetsFormValues } from "../schemas/profile";
-import { updateUser, ApiError } from "../lib/api";
+import { updateProfile, updateBudgets, ApiError } from "../lib/api";
 import { PAYMENTS } from "../constants/payments";
 import { Field } from "../components/Field";
 
@@ -27,7 +27,7 @@ function saveButtonClass(busy: boolean) {
 }
 
 export default function Profile({ user, onUserUpdate, onLogout, navigate }: Props) {
-  const infoForm = useForm<PersonalInfoFormValues>({
+  const infoForm = useForm<PersonalInfoInput>({
     resolver: zodResolver(personalInfoSchema),
     defaultValues: {
       nome: user.nome,
@@ -36,19 +36,19 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
     },
   });
 
-  const budgetsForm = useForm<BudgetsFormValues>({
+  const budgetsForm = useForm<BudgetsInput>({
     resolver: zodResolver(budgetsSchema),
     defaultValues: user.budgets ?? DEFAULT_BUDGETS,
   });
 
   const saveInfoMutation = useMutation({
-    mutationFn: (values: PersonalInfoFormValues) => updateUser(user.id, values),
-    onSuccess: (_data, values) => onUserUpdate({ ...user, ...values }),
+    mutationFn: (values: PersonalInfoInput) => updateProfile(values),
+    onSuccess: (updatedUser, _values) => onUserUpdate(updatedUser),
   });
 
   const saveBudgetsMutation = useMutation({
-    mutationFn: (values: BudgetsFormValues) => updateUser(user.id, { budgets: values }),
-    onSuccess: (_data, values) => onUserUpdate({ ...user, budgets: values }),
+    mutationFn: (values: BudgetsInput) => updateBudgets(values),
+    onSuccess: (updatedBudgets) => onUserUpdate({ ...user, budgets: updatedBudgets as CategoryBudgets }),
   });
 
   const errorMessage = (error: unknown, fallback: string) =>

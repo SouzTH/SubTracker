@@ -1,47 +1,92 @@
-// Camada única de acesso à API (json-server).
-//
-// Antes, cada tela tinha o seu próprio `fetch("http://localhost:3000/...")`
-// espalhado pelo código, cada uma tratando erro à sua maneira. Centralizar
-// aqui segue o princípio DRY e dá um único lugar para trocar a URL base,
-// ajustar headers ou mudar de backend no futuro.
+import type { Subscription, CurrentUser, CategoryBudgets } from "../App";
 
-import type { Subscription, CurrentUser } from "../App";
-
-const BASE_URL = "http://localhost:3000";
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001/api").replace(/\/$/, "");
+const TOKEN_KEY = "subtracker_token";
+const USER_KEY = "subtracker_user";
 
 export class ApiError extends Error {
-  constructor(message: string) {
+  constructor(message: string, public status?: number) {
     super(message);
     this.name = "ApiError";
   }
 }
 
+export interface AuthResponse {
+  token: string;
+  user: CurrentUser;
+}
+
+export function getStoredToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function getStoredUser(): CurrentUser | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as CurrentUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSession(token: string, user: CurrentUser) {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers ?? {});
+  if (!headers.has("Content-Type") && !(init?.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const token = getStoredToken();
+  if (token && !(path.startsWith("/auth/login") || path.startsWith("/auth/register"))) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
   let response: Response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
-      headers: { "Content-Type": "application/json" },
+    response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
+      headers,
     });
   } catch {
-    throw new ApiError(
-      "Não foi possível conectar ao servidor. Verifique se o json-server está rodando (npm run server).",
-    );
+    throw new ApiError("Não foi possível conectar ao servidor. Verifique se a API está em execução.", 0);
+  }
+
+  let payload: any = null;
+  const text = await response.text();
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = text;
+    }
   }
 
   if (!response.ok) {
-    throw new ApiError(`Falha na requisição (HTTP ${response.status}).`);
+    const message = payload?.error ?? payload?.message ?? `Falha na requisição (HTTP ${response.status}).`;
+    if (response.status === 401) {
+      clearSession();
+    }
+    throw new ApiError(message, response.status);
   }
 
-  // DELETE e algumas respostas não têm corpo
-  const text = await response.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  if (response.status === 204 || payload === null || payload === undefined) {
+    return undefined as T;
+  }
+
+  return payload as T;
 }
 
-// --- Usuários / autenticação ---
-
 export interface StoredUser extends CurrentUser {
-  password: string;
+  password?: string;
 }
 
 export function findUsersByEmail(email: string) {
@@ -55,33 +100,78 @@ export function createUser(data: { nome: string; email: string; password: string
   });
 }
 
-export function updateUser(id: string, patch: Partial<StoredUser>) {
-  return request<StoredUser>(`/users/${id}`, {
+export function getCurrentUser() {
+  return request<CurrentUser>(`/auth/me`);
+}
+
+export function updateProfile(patch: Partial<CurrentUser>) {
+  return request<CurrentUser>(`/auth/me`, {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
 }
 
-// --- Assinaturas ---
-
-export function getSubsByUser(userId: string) {
-  return request<Subscription[]>(`/subs?userId=${userId}`);
+export function getBudgets() {
+  return request<CategoryBudgets>(`/budgets`);
 }
 
-export function createSub(data: Omit<Subscription, "id">) {
-  return request<Subscription>(`/subs`, {
+export function updateBudgets(patch: Record<string, number>) {
+  return request<CategoryBudgets>(`/budgets`, {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
+}
+
+export function updateUser(_id: string, patch: Partial<StoredUser>) {
+  return request<CurrentUser>(`/auth/me`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export function resetPasswordDemo(data: { email: string; password: string }) {
+  return request<{ ok: boolean; message: string }>(`/auth/reset-password`, {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
-export function updateSub(id: string | number, patch: Partial<Subscription>) {
-  return request<Subscription>(`/subs/${id}`, {
+export function loginUser(data: { email: string; password: string }) {
+  return request<AuthResponse>(`/auth/login`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function registerUser(data: { nome: string; email: string; password: string }) {
+  return request<AuthResponse>(`/auth/register`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// --- Assinaturas ---
+
+export function getSubsByUser() {
+  return request<Subscription[]>(`/subscriptions`);
+}
+
+export function createSub(data: Omit<Subscription, "id" | "userId">) {
+  const { userId: _userId, ...payload } = data as Subscription;
+  return request<Subscription>(`/subscriptions`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateSub(id: string | number, patch: Partial<Omit<Subscription, "id" | "userId">>) {
+  const { userId: _userId, ...payload } = patch as Partial<Subscription>;
+  return request<Subscription>(`/subscriptions/${id}`, {
     method: "PATCH",
-    body: JSON.stringify(patch),
+    body: JSON.stringify(payload),
   });
 }
 
 export function deleteSub(id: string | number) {
-  return request<void>(`/subs/${id}`, { method: "DELETE" });
+  return request<void>(`/subscriptions/${id}`, { method: "DELETE" });
 }

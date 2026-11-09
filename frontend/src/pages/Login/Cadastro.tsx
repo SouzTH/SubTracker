@@ -2,8 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { registerSchema, RegisterFormValues } from '../../schemas/auth';
-import { findUsersByEmail, createUser, ApiError } from '../../lib/api';
+import { registerSchema, type RegisterInput } from '@subtracker/shared';
+import { ApiError, registerUser } from '../../lib/api';
 
 export function Register() {
     const navigate = useNavigate();
@@ -13,30 +13,24 @@ export function Register() {
         handleSubmit,
         formState: { errors },
         setError,
-    } = useForm<RegisterFormValues>({ resolver: zodResolver(registerSchema) });
+    } = useForm<RegisterInput>({ resolver: zodResolver(registerSchema) });
 
     const registerMutation = useMutation({
-        mutationFn: async (values: RegisterFormValues) => {
-            const existing = await findUsersByEmail(values.email);
-            if (existing.length > 0) {
-                throw new ApiError('Este email já está cadastrado.');
-            }
-            return createUser(values);
-        },
+        mutationFn: async (values: RegisterInput) => registerUser(values),
         onSuccess: () => {
             setTimeout(() => navigate('/'), 1200);
         },
         onError: (error) => {
             setError('root', {
                 message:
-                    error instanceof ApiError
+                    error instanceof ApiError && error.message
                         ? error.message
-                        : 'Não foi possível conectar ao servidor. Verifique se o json-server está rodando (npm run server).',
+                        : 'Não foi possível conectar ao servidor. Verifique se a API está em execução.',
             });
         },
     });
 
-    const onSubmit = (values: RegisterFormValues) => registerMutation.mutate(values);
+    const onSubmit = (values: RegisterInput) => registerMutation.mutate(values);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-background px-4">
