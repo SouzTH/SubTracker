@@ -6,6 +6,7 @@ import { CurrentUser, CategoryBudgets, DEFAULT_BUDGETS, Screen } from "../App";
 import { updateProfile, updateBudgets, ApiError } from "../lib/api";
 import { PAYMENTS } from "../constants/payments";
 import { Field } from "../components/Field";
+import type { z } from "zod";
 
 interface Props {
   user: CurrentUser;
@@ -36,7 +37,7 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
     },
   });
 
-  const budgetsForm = useForm<BudgetsInput>({
+  const budgetsForm = useForm<z.input<typeof budgetsSchema>, unknown, BudgetsInput>({
     resolver: zodResolver(budgetsSchema),
     defaultValues: user.budgets ?? DEFAULT_BUDGETS,
   });

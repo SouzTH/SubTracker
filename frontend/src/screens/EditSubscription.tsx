@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Subscription, Screen, getStoredUser } from "../App";
-import { subscriptionSchema, SubscriptionFormValues, CATEGORY_VALUES, PERIOD_VALUES } from "../schemas/subscription";
+import { subscriptionSchema, SubscriptionFormInput, SubscriptionFormValues, CATEGORY_VALUES, PERIOD_VALUES } from "../schemas/subscription";
 import { updateSub, ApiError } from "../lib/api";
 import { subsQueryKey } from "../lib/queryClient";
 import { PAYMENTS } from "../constants/payments";
@@ -23,7 +23,7 @@ export default function EditSubscription({ sub, navigate }: Props) {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<SubscriptionFormValues>({
+  } = useForm<SubscriptionFormInput, unknown, SubscriptionFormValues>({
     resolver: zodResolver(subscriptionSchema),
     defaultValues: {
       category: sub.category,

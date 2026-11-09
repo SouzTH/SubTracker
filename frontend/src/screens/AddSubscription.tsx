@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Screen, Subscription, getStoredUser } from "../App";
-import { subscriptionSchema, SubscriptionFormValues, CATEGORY_VALUES, PERIOD_VALUES } from "../schemas/subscription";
+import { subscriptionSchema, SubscriptionFormInput, SubscriptionFormValues, CATEGORY_VALUES, PERIOD_VALUES } from "../schemas/subscription";
 import { createSub, ApiError } from "../lib/api";
 import { subsQueryKey } from "../lib/queryClient";
 import { SERVICES, ServiceCatalogEntry } from "../constants/catalog";
@@ -28,7 +28,7 @@ export default function AddSubscription({ navigate }: Props) {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<SubscriptionFormValues>({
+  } = useForm<SubscriptionFormInput, unknown, SubscriptionFormValues>({
     resolver: zodResolver(subscriptionSchema),
     defaultValues: {
       period: "Mensal",
