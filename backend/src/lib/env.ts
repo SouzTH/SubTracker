@@ -32,6 +32,20 @@ function positiveInteger(name: string, fallback: number): number {
   return value;
 }
 
+function booleanValue(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (raw === undefined) {
+    return fallback;
+  }
+  if (raw.trim().toLowerCase() === "true") {
+    return true;
+  }
+  if (raw.trim().toLowerCase() === "false") {
+    return false;
+  }
+  throw new Error(`Variável de ambiente ${name} precisa ser "true" ou "false".`);
+}
+
 const jwtSecret = required("JWT_SECRET");
 
 export const env = {
@@ -49,6 +63,10 @@ export const env = {
   ),
   frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
   isProduction: process.env.NODE_ENV === "production",
-  enableDemoPasswordReset:
-    (process.env.ENABLE_DEMO_PASSWORD_RESET ?? "false").trim().toLowerCase() === "true",
+  smtpHost: process.env.SMTP_HOST?.trim(),
+  smtpPort: positiveInteger("SMTP_PORT", 587),
+  smtpSecure: booleanValue("SMTP_SECURE", false),
+  smtpUser: process.env.SMTP_USER?.trim(),
+  smtpPassword: process.env.SMTP_PASSWORD,
+  passwordResetEmailFrom: process.env.PASSWORD_RESET_EMAIL_FROM?.trim(),
 };

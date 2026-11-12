@@ -55,6 +55,7 @@ export function toUser(row: UserWithBudgets): User {
     nome: row.nome,
     email: row.email,
     passwordHash: row.passwordHash,
+    authVersion: row.authVersion,
     telefone: row.telefone ?? undefined,
     paymentMethod: row.paymentMethod ?? undefined,
     budgets: mergeBudgets(row.budgets),

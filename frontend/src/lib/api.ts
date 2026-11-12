@@ -91,7 +91,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const token = getStoredToken();
-  if (token && !(path.startsWith("/auth/login") || path.startsWith("/auth/register"))) {
+  const isPublicAuthPath = [
+    "/auth/login",
+    "/auth/register",
+    "/auth/password-reset/",
+  ].some((authPath) => path.startsWith(authPath));
+  if (token && !isPublicAuthPath) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
@@ -100,6 +105,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     "/auth/register",
     "/auth/refresh",
     "/auth/logout",
+    "/auth/password-reset/",
   ].some((authPath) => path.startsWith(authPath));
 
   const send = async () => {
@@ -212,8 +218,15 @@ export function updateUser(_id: string, patch: Partial<StoredUser>) {
   });
 }
 
-export function resetPasswordDemo(data: { email: string; password: string }) {
-  return request<{ ok: boolean; message: string }>(`/auth/reset-password`, {
+export function requestPasswordReset(data: { email: string }) {
+  return request<{ message: string }>(`/auth/password-reset/request`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function completePasswordReset(data: { token: string; password: string }) {
+  return request<{ ok: boolean; message: string }>(`/auth/password-reset/complete`, {
     method: "POST",
     body: JSON.stringify(data),
   });

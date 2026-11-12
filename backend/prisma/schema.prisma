@@ -28,6 +28,7 @@ model User {
   nome          String
   email         String  @unique
   passwordHash  String
+  authVersion   Int     @default(0)
   telefone      String?
   paymentMethod String? @default("Cartão de crédito")
 
@@ -37,6 +38,7 @@ model User {
   budgets         Budget[]
   subscriptions   Subscription[]
   refreshSessions RefreshSession[]
+  passwordResetTokens PasswordResetToken[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -54,6 +56,19 @@ model RefreshSession {
   @@index([userId])
   @@index([expiresAt])
   @@map("refresh_sessions")
+}
+
+model PasswordResetToken {
+  tokenHash String   @id
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model Budget {

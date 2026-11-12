@@ -21,6 +21,7 @@ export interface User {
   nome: string;
   email: string;
   passwordHash: string;
+  authVersion: number;
   telefone?: string;
   paymentMethod?: string;
   // Sempre completo: categorias nunca personalizadas vêm com o valor padrão.
@@ -62,14 +63,18 @@ export interface UserRepository {
   create(data: NewUser): Promise<User>;
   /** Devolve null se o usuário não existir mais. */
   update(id: string, patch: UpdateProfileInput): Promise<User | null>;
-  /** Atualiza somente a senha do usuário após reset demonstrativo. */
-  resetPassword(id: string, passwordHash: string): Promise<User | null>;
 }
 
 export interface RefreshSessionRepository {
   create(jti: string, userId: string, expiresAt: Date): Promise<void>;
   consume(jti: string, userId: string, now: Date): Promise<boolean>;
   revokeAllForUser(userId: string): Promise<void>;
+}
+
+export interface PasswordResetRepository {
+  create(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
+  delete(tokenHash: string): Promise<void>;
+  consumeAndResetPassword(tokenHash: string, passwordHash: string, now: Date): Promise<boolean>;
 }
 
 // Todos os métodos recebem `userId`: o isolamento entre contas é
@@ -93,6 +98,7 @@ export interface BudgetRepository {
 export interface Repositories {
   users: UserRepository;
   refreshSessions: RefreshSessionRepository;
+  passwordResets: PasswordResetRepository;
   subscriptions: SubscriptionRepository;
   budgets: BudgetRepository;
 }

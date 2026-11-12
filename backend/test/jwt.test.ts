@@ -20,4 +20,5 @@ test("refresh JWTs are unique, verifiable, and distinct from access JWTs", () =>
   const accessPayload = jwt.verify(signAccessToken("user-1"), env.jwtSecret);
   assert.equal(typeof accessPayload, "object");
   assert.equal((accessPayload as jwt.JwtPayload).tokenUse, "access");
+  assert.equal((accessPayload as jwt.JwtPayload).authVersion, 0);
 });

@@ -78,6 +78,30 @@ ficam no volume Docker).
 Documentação interativa OpenAPI: <http://localhost:3001/api-docs>.
 O documento JSON fica em <http://localhost:3001/api-docs/openapi.json>.
 
+### Configurar envio de recuperação pelo Brevo
+
+1. Crie uma conta no <https://www.brevo.com/> e verifique um remetente
+   autorizado para envio (endereço ou domínio, conforme a configuração da conta).
+2. Em <https://app.brevo.com/settings/keys/smtp>, copie o login SMTP e gere uma
+   **chave SMTP**. Não use uma chave de API.
+3. No arquivo local `backend/.env` (não no `.env.example`), configure:
+
+   ```dotenv
+   SMTP_HOST="smtp-relay.brevo.com"
+   SMTP_PORT=587
+   SMTP_SECURE=false
+   SMTP_USER="login-smtp-do-brevo"
+   SMTP_PASSWORD="chave-smtp-do-brevo"
+   PASSWORD_RESET_EMAIL_FROM="remetente-verificado@seudominio.com"
+   ```
+
+   `SMTP_USER` é o login SMTP mostrado no painel; `SMTP_PASSWORD` é a chave
+   SMTP gerada ali; `PASSWORD_RESET_EMAIL_FROM` precisa ser um remetente
+   verificado no Brevo. Não compartilhe nem versione a chave SMTP.
+4. Reinicie o backend (`Ctrl+C` no terminal e `npm run dev` novamente).
+5. Solicite a recuperação com o e-mail cadastrado na conta SubTracker e confira
+   a caixa de entrada e a pasta de spam desse endereço.
+
 Para renovar uma sessão, o frontend envia o refresh cookie automaticamente
 quando uma rota protegida retorna 401. O refresh token é de uso único e o
 servidor o troca por um novo cookie e access token.
@@ -103,6 +127,8 @@ POST   /api/auth/register          { nome, email, password } → { accessToken, 
 POST   /api/auth/login             { email, password }       → { accessToken, user }
 POST   /api/auth/refresh            cookie HttpOnly           → { accessToken }
 POST   /api/auth/logout             cookie HttpOnly           → 204
+POST   /api/auth/password-reset/request  { email }            → resposta genérica
+POST   /api/auth/password-reset/complete { token, password }  → senha redefinida
 GET    /api/auth/me
 PATCH  /api/auth/me                { nome?, telefone?, paymentMethod? }
 
@@ -161,12 +187,17 @@ docker exec -it subtracker-postgres psql -U subtracker -d subtracker \
 
 - O refresh token é `HttpOnly`, tem chave de assinatura separada derivada do
   `JWT_SECRET`, é armazenado no banco por identificador e só pode ser usado
-  uma vez. O logout e a redefinição demonstrativa de senha revogam sessões.
+  uma vez. O logout e a redefinição de senha revogam sessões.
+- A recuperação envia um token aleatório por SMTP, guarda somente seu hash no
+  banco e invalida o token após o uso. O link expira em 20 minutos; os endpoints
+  têm limite de tentativas por IP. Ao redefinir a senha, refresh tokens e
+  access tokens anteriores são invalidados.
+- Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
+  `SMTP_PASSWORD` e `PASSWORD_RESET_EMAIL_FROM` no `.env` para habilitar o
+  envio. O usuário SMTP deve estar autorizado a enviar usando o endereço
+  configurado em `PASSWORD_RESET_EMAIL_FROM`.
 - Em produção, configure `JWT_SECRET` com um valor aleatório forte, defina
   `JWT_REFRESH_SECRET` com outra chave forte, sirva a aplicação por HTTPS e
   use `NODE_ENV=production` para habilitar o atributo `Secure` do cookie.
-- `ENABLE_DEMO_PASSWORD_RESET=true` permite redefinir uma senha apenas com o
-  e-mail e é **somente para demonstração local**. Mantenha desabilitado em
-  produção até implementar confirmação por e-mail.
 - `start` usa `tsx` (o `shared` é TypeScript sem build); para produção
   valeria empacotar o `shared` ou usar um bundler.

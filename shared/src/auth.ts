@@ -27,22 +27,9 @@ export type ForgotEmailInput = z.infer<typeof forgotEmailSchema>;
 
 export const resetPasswordSchema = z
   .object({
-    email: emailField,
+    token: z.string().min(1, "Token de recuperação inválido").max(256),
     password: z
       .string()
-      .min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`)
-      .optional(),
-    novaSenha: z
-      .string()
-      .min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`)
-      .optional(),
-  })
-  .refine((data) => Boolean(data.password ?? data.novaSenha), {
-    message: "Informe a nova senha",
-    path: ["password"],
-  })
-  .transform((data) => ({
-    email: data.email,
-    password: data.password ?? data.novaSenha ?? "",
-  }));
+      .min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`),
+  });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

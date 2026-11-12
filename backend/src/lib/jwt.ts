@@ -5,6 +5,7 @@ import { env } from "./env";
 export interface AccessTokenPayload {
   userId: string;
   tokenUse: "access";
+  authVersion: number;
 }
 
 export interface RefreshTokenPayload {
@@ -13,8 +14,8 @@ export interface RefreshTokenPayload {
   jti: string;
 }
 
-export function signAccessToken(userId: string): string {
-  return jwt.sign({ userId, tokenUse: "access" }, env.jwtSecret, {
+export function signAccessToken(userId: string, authVersion = 0): string {
+  return jwt.sign({ userId, tokenUse: "access", authVersion }, env.jwtSecret, {
     expiresIn: env.jwtAccessTokenTtlSeconds,
     algorithm: "HS256",
   });

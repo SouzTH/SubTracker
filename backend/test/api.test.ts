@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import test, { after, before } from "node:test";
 import app from "../src/app";
 import { prisma } from "../src/lib/prisma";
+import { repositories } from "../src/repositories";
 
 let server: ReturnType<typeof app.listen>;
 let baseUrl: string;
@@ -69,6 +70,8 @@ test("API rotates refresh cookies, protects routes, and isolates subscription ow
   assert.equal(openApi.status, 200);
   const openApiBody = await openApi.json() as { paths: Record<string, unknown> };
   assert.ok("/api/auth/refresh" in openApiBody.paths);
+  assert.ok("/api/auth/password-reset/request" in openApiBody.paths);
+  assert.ok("/api/auth/password-reset/complete" in openApiBody.paths);
   assert.ok("/api/subscriptions/{id}" in openApiBody.paths);
   const docsUi = await fetch(`${baseUrl}/api-docs`);
   assert.equal(docsUi.status, 200);
@@ -141,4 +144,52 @@ test("API rotates refresh cookies, protects routes, and isolates subscription ow
 
   const cleanupRegistrationSession = await post("/api/auth/logout", undefined, registrationCookie);
   assert.equal(cleanupRegistrationSession.status, 204);
+
+  const activeResetSession = await post("/api/auth/login", {
+    email: firstEmail,
+    password: "password-test-123",
+  });
+  assert.equal(activeResetSession.status, 200);
+  const activeResetCookie = cookieFrom(activeResetSession);
+
+  const rawResetToken = randomBytes(32).toString("base64url");
+  const resetTokenHash = createHash("sha256").update(rawResetToken).digest("hex");
+  await repositories.passwordResets.create(
+    registrationBody.user.id,
+    resetTokenHash,
+    new Date(Date.now() + 60_000),
+  );
+
+  const completedReset = await post("/api/auth/password-reset/complete", {
+    token: rawResetToken,
+    password: "new-password-123",
+  });
+  assert.equal(completedReset.status, 200);
+
+  const reusedResetToken = await post("/api/auth/password-reset/complete", {
+    token: rawResetToken,
+    password: "another-password-123",
+  });
+  assert.equal(reusedResetToken.status, 400);
+
+  const revokedResetSession = await post("/api/auth/refresh", undefined, activeResetCookie);
+  assert.equal(revokedResetSession.status, 401);
+  const revokedAccessToken = await fetch(`${baseUrl}/api/subscriptions`, {
+    headers: { Authorization: `Bearer ${loginBody.accessToken}` },
+  });
+  assert.equal(revokedAccessToken.status, 401);
+
+  const loginWithOldPassword = await post("/api/auth/login", {
+    email: firstEmail,
+    password: "password-test-123",
+  });
+  assert.equal(loginWithOldPassword.status, 401);
+
+  const loginWithNewPassword = await post("/api/auth/login", {
+    email: firstEmail,
+    password: "new-password-123",
+  });
+  assert.equal(loginWithNewPassword.status, 200);
+  const newPasswordSession = cookieFrom(loginWithNewPassword);
+  await post("/api/auth/logout", undefined, newPasswordSession);
 });

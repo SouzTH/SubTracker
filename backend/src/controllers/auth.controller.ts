@@ -1,13 +1,16 @@
 import {
+  forgotEmailSchema,
   loginSchema,
   registerSchema,
   resetPasswordSchema,
   updateProfileSchema,
 } from "@subtracker/shared";
 import bcrypt from "bcryptjs";
+import { createHash, randomBytes } from "node:crypto";
 import type { Request, Response } from "express";
 import { env } from "../lib/env";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../lib/jwt";
+import { getPasswordResetTransport, sendPasswordResetEmail } from "../lib/passwordResetEmail";
 import { clearRefreshCookie, REFRESH_COOKIE_NAME, setRefreshCookie } from "../lib/refreshCookie";
 import { getUserId } from "../middleware/auth";
 import { repositories } from "../repositories";
@@ -23,11 +26,11 @@ const DUMMY_HASH = bcrypt.hashSync("senha-que-nao-existe", SALT_ROUNDS);
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-async function issueTokens(userId: string, res: Response) {
+async function issueTokens(userId: string, authVersion: number, res: Response) {
   const refresh = signRefreshToken(userId);
   await repositories.refreshSessions.create(refresh.jti, userId, refresh.expiresAt);
   setRefreshCookie(res, refresh.token);
-  return signAccessToken(userId);
+  return signAccessToken(userId, authVersion);
 }
 
 // POST /api/auth/register
@@ -45,7 +48,7 @@ export async function register(req: Request, res: Response) {
     email,
     passwordHash,
   });
-  const accessToken = await issueTokens(user.id, res);
+  const accessToken = await issueTokens(user.id, user.authVersion, res);
 
   res.status(201).json({
     accessToken,
@@ -69,7 +72,7 @@ export async function login(req: Request, res: Response) {
     throw new AppError("E-mail ou senha incorretos.", 401);
   }
 
-  const accessToken = await issueTokens(user.id, res);
+  const accessToken = await issueTokens(user.id, user.authVersion, res);
   res.json({
     accessToken,
     user: toPublicUser(user),
@@ -96,7 +99,7 @@ export async function refresh(req: Request, res: Response) {
     throw new AppError("Sessão expirada. Faça login novamente.", 401);
   }
 
-  const accessToken = await issueTokens(user.id, res);
+  const accessToken = await issueTokens(user.id, user.authVersion, res);
   res.json({ accessToken });
 }
 
@@ -140,33 +143,69 @@ export async function updateMe(req: Request, res: Response) {
   res.json(toPublicUser(user));
 }
 
-// POST /api/auth/reset-password — fluxo demonstrativo para redefinir a senha.
-// Requer FLAG ENABLE_DEMO_PASSWORD_RESET="true" no backend.
-export async function resetPassword(req: Request, res: Response) {
-  if (!env.enableDemoPasswordReset) {
-    throw new AppError("A recuperação demonstrativa de senha está desabilitada.", 403);
-  }
+const PASSWORD_RESET_TTL_MS = 20 * 60 * 1000;
+const PASSWORD_RESET_MIN_RESPONSE_MS = 250;
+const PASSWORD_RESET_RESPONSE =
+  "Se houver uma conta com esse e-mail, você receberá um link para redefinir a senha.";
 
-  const data = resetPasswordSchema.parse(req.body);
+// POST /api/auth/password-reset/request
+export async function requestPasswordReset(req: Request, res: Response) {
+  const startedAt = Date.now();
+  const data = forgotEmailSchema.parse(req.body);
+  getPasswordResetTransport();
   const email = normalizeEmail(data.email);
-
   const user = await repositories.users.findByEmail(email);
-  if (!user) {
-    throw new AppError("Não encontramos nenhuma conta com este e-mail.", 404);
+
+  if (user) {
+    const token = randomBytes(32).toString("base64url");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    await repositories.passwordResets.create(
+      user.id,
+      tokenHash,
+      new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+    );
+
+    const resetUrl = new URL("/esqueci-senha", env.frontendUrl);
+    resetUrl.searchParams.set("token", token);
+    void sendPasswordResetEmail(email, resetUrl.toString()).catch(async (error) => {
+      const mailError = error as NodeJS.ErrnoException;
+      console.error("Falha ao enviar e-mail de redefinição de senha.", {
+        code: mailError.code,
+        message: mailError.message,
+      });
+      try {
+        await repositories.passwordResets.delete(tokenHash);
+      } catch (cleanupError) {
+        const cleanup = cleanupError as NodeJS.ErrnoException;
+        console.error("Falha ao invalidar token não enviado.", {
+          code: cleanup.code,
+          message: cleanup.message,
+        });
+      }
+    });
   }
 
+  const remainingDelay = PASSWORD_RESET_MIN_RESPONSE_MS - (Date.now() - startedAt);
+  if (remainingDelay > 0) {
+    await new Promise((resolve) => setTimeout(resolve, remainingDelay));
+  }
+  res.status(202).json({ message: PASSWORD_RESET_RESPONSE });
+}
+
+// POST /api/auth/password-reset/complete
+export async function resetPassword(req: Request, res: Response) {
+  const data = resetPasswordSchema.parse(req.body);
+  const tokenHash = createHash("sha256").update(data.token).digest("hex");
   const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
-  const updated = await repositories.users.resetPassword(
-    user.id,
-    passwordHash
+  const reset = await repositories.passwordResets.consumeAndResetPassword(
+    tokenHash,
+    passwordHash,
+    new Date(),
   );
-  if (!updated) {
-    throw new AppError("Não foi possível atualizar a senha.", 404);
-  }
-  await repositories.refreshSessions.revokeAllForUser(user.id);
 
-  res.json({
-    ok: true,
-    message: "Senha redefinida com sucesso. Esta funcionalidade é demonstrativa.",
-  });
+  if (!reset) {
+    throw new AppError("O link de redefinição é inválido ou expirou.", 400);
+  }
+
+  res.json({ ok: true, message: "Senha redefinida. Faça login com a nova senha." });
 }

@@ -26,7 +26,12 @@ passport.use(
 
         // Token válido mas de uma conta que foi apagada → não autentica.
         const user = await repositories.users.findById(payload.userId);
-        done(null, user ? { userId: user.id } : false);
+        done(
+          null,
+          user && payload.authVersion === user.authVersion
+            ? { userId: user.id }
+            : false,
+        );
       } catch (error) {
         done(error, false);
       }

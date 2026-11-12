@@ -164,20 +164,46 @@
         }
       }
     },
-    "/api/auth/reset-password": {
+    "/api/auth/password-reset/request": {
       "post": {
         "tags": ["Autenticação"],
-        "summary": "Redefine a senha no fluxo demonstrativo",
-        "description": "Disponível somente quando ENABLE_DEMO_PASSWORD_RESET=true. Não é recuperação de senha segura para produção.",
+        "summary": "Solicita um link de redefinição de senha",
+        "description": "A resposta é genérica para não revelar se o e-mail está cadastrado. O link é enviado ao e-mail da conta e expira em 20 minutos.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["email", "password"],
+                "required": ["email"],
                 "properties": {
-                  "email": { "type": "string", "format": "email" },
+                  "email": { "type": "string", "format": "email" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": { "description": "Solicitação recebida; a resposta não confirma a existência da conta" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "description": "Limite de solicitações excedido" },
+          "503": { "description": "Serviço SMTP de recuperação não configurado" }
+        }
+      }
+    },
+    "/api/auth/password-reset/complete": {
+      "post": {
+        "tags": ["Autenticação"],
+        "summary": "Redefine a senha com o token enviado por e-mail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "password"],
+                "properties": {
+                  "token": { "type": "string" },
                   "password": { "type": "string", "format": "password", "minLength": 4 }
                 }
               }
@@ -185,8 +211,9 @@
           }
         },
         "responses": {
-          "200": { "description": "Senha redefinida" },
-          "403": { "description": "Fluxo demonstrativo desabilitado" }
+          "200": { "description": "Senha redefinida e sessões anteriores revogadas" },
+          "400": { "description": "Token inválido, expirado ou dados inválidos" },
+          "429": { "description": "Limite de tentativas excedido" }
         }
       }
     },
