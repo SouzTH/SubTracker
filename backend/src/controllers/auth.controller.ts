@@ -7,7 +7,8 @@ import {
 import bcrypt from "bcryptjs";
 import type { Request, Response } from "express";
 import { env } from "../lib/env";
-import { signToken } from "../lib/jwt";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../lib/jwt";
+import { clearRefreshCookie, REFRESH_COOKIE_NAME, setRefreshCookie } from "../lib/refreshCookie";
 import { getUserId } from "../middleware/auth";
 import { repositories } from "../repositories";
 import { AppError } from "../utils/AppError";
@@ -21,6 +22,13 @@ const SALT_ROUNDS = 10;
 const DUMMY_HASH = bcrypt.hashSync("senha-que-nao-existe", SALT_ROUNDS);
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+async function issueTokens(userId: string, res: Response) {
+  const refresh = signRefreshToken(userId);
+  await repositories.refreshSessions.create(refresh.jti, userId, refresh.expiresAt);
+  setRefreshCookie(res, refresh.token);
+  return signAccessToken(userId);
+}
 
 // POST /api/auth/register
 export async function register(req: Request, res: Response) {
@@ -37,9 +45,10 @@ export async function register(req: Request, res: Response) {
     email,
     passwordHash,
   });
+  const accessToken = await issueTokens(user.id, res);
 
   res.status(201).json({
-    token: signToken({ userId: user.id }),
+    accessToken,
     user: toPublicUser(user),
   });
 }
@@ -60,10 +69,51 @@ export async function login(req: Request, res: Response) {
     throw new AppError("E-mail ou senha incorretos.", 401);
   }
 
+  const accessToken = await issueTokens(user.id, res);
   res.json({
-    token: signToken({ userId: user.id }),
+    accessToken,
     user: toPublicUser(user),
   });
+}
+
+// POST /api/auth/refresh
+export async function refresh(req: Request, res: Response) {
+  const token = req.cookies?.[REFRESH_COOKIE_NAME];
+  const payload = typeof token === "string" ? verifyRefreshToken(token) : null;
+
+  if (!payload || !(await repositories.refreshSessions.consume(
+    payload.jti,
+    payload.userId,
+    new Date(),
+  ))) {
+    clearRefreshCookie(res);
+    throw new AppError("Sessão expirada. Faça login novamente.", 401);
+  }
+
+  const user = await repositories.users.findById(payload.userId);
+  if (!user) {
+    clearRefreshCookie(res);
+    throw new AppError("Sessão expirada. Faça login novamente.", 401);
+  }
+
+  const accessToken = await issueTokens(user.id, res);
+  res.json({ accessToken });
+}
+
+// POST /api/auth/logout
+export async function logout(req: Request, res: Response) {
+  const token = req.cookies?.[REFRESH_COOKIE_NAME];
+  const payload = typeof token === "string" ? verifyRefreshToken(token) : null;
+  if (payload) {
+    await repositories.refreshSessions.consume(
+      payload.jti,
+      payload.userId,
+      new Date(),
+    );
+  }
+
+  clearRefreshCookie(res);
+  res.status(204).send();
 }
 
 // GET /api/auth/me
@@ -113,6 +163,7 @@ export async function resetPassword(req: Request, res: Response) {
   if (!updated) {
     throw new AppError("Não foi possível atualizar a senha.", 404);
   }
+  await repositories.refreshSessions.revokeAllForUser(user.id);
 
   res.json({
     ok: true,

@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { registerSchema, type RegisterInput } from '@subtracker/shared';
-import { ApiError, registerUser } from '../../lib/api';
+import { ApiError, registerUser, saveSession } from '../../lib/api';
 
 export function Register() {
     const navigate = useNavigate();
@@ -17,8 +17,9 @@ export function Register() {
 
     const registerMutation = useMutation({
         mutationFn: async (values: RegisterInput) => registerUser(values),
-        onSuccess: () => {
-            setTimeout(() => navigate('/'), 1200);
+        onSuccess: ({ accessToken, user }) => {
+            saveSession(accessToken, user);
+            navigate('/painel');
         },
         onError: (error) => {
             setError('root', {

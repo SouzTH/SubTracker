@@ -17,8 +17,8 @@ export function Login() {
 
     const loginMutation = useMutation({
         mutationFn: async ({ email, password }: LoginInput) => loginUser({ email, password }),
-        onSuccess: ({ token, user }) => {
-            saveSession(token, user);
+        onSuccess: ({ accessToken, user }) => {
+            saveSession(accessToken, user);
             navigate('/painel');
         },
         onError: (error) => {

@@ -4,11 +4,10 @@ API REST do SubTracker: **Express + TypeScript + Prisma + PostgreSQL**, com
 autenticação JWT e validação Zod **compartilhada com o frontend**
 (`../shared`).
 
-> **Importante:** esta pasta é a base da etapa *seguinte* à AV1. O frontend
-> continua falando só com o json-server (`frontend/src/lib/api.ts`), como a
-> AV1 pede (frontend + json-server, sem backend real). Nada aqui é
-> chamado pelo frontend ainda — foi proposital, para não arriscar o que já
-> funciona e será avaliado.
+O frontend usa esta API Express com PostgreSQL. O login devolve um JWT de
+acesso de uma hora; o refresh token é rotacionado pelo servidor e mantido
+em cookie `HttpOnly` por até sete dias. Assinaturas e orçamentos são sempre
+isolados pelo ID do usuário autenticado.
 
 ## Alinhamento com a aula 10 (MongoDB e Prisma no lugar do JSON)
 
@@ -57,13 +56,18 @@ npm install            # instala o backend e também o ../shared (postinstall)
 # crie o .env a partir do exemplo
 cp .env.example .env              # Git Bash / Linux / macOS
 # Copy-Item .env.example .env     # PowerShell
-# edite o .env e troque o JWT_SECRET por uma string longa e aleatória
+# confirme a DATABASE_URL para localhost:5433 e troque o JWT_SECRET por uma string longa e aleatória
 
 npm run db:up                     # sobe o PostgreSQL (Docker)
-npx prisma migrate dev --name init   # cria as tabelas (gera prisma/migrations/)
+npx prisma migrate deploy         # aplica as migrações versionadas
+npx prisma generate               # gera o cliente Prisma
 npm run seed                      # cria o usuário de teste
 npm run dev                       # API em http://localhost:3001
 ```
+
+O PostgreSQL do Compose escuta na porta `5432` dentro do contêiner e é publicado
+em `localhost:5433` para evitar conflito com instalações locais do PostgreSQL.
+Use o usuário e a senha configurados no Compose (`subtracker`) na `DATABASE_URL`.
 
 Usuário criado pelo seed: `teste@subtracker.com` / `123456`.
 
@@ -71,16 +75,34 @@ Outros comandos: `npm run typecheck` (confere os tipos), `npm run prisma:studio`
 (interface visual do banco), `npm run db:down` (para o Postgres; os dados
 ficam no volume Docker).
 
+Documentação interativa OpenAPI: <http://localhost:3001/api-docs>.
+O documento JSON fica em <http://localhost:3001/api-docs/openapi.json>.
+
+Para renovar uma sessão, o frontend envia o refresh cookie automaticamente
+quando uma rota protegida retorna 401. O refresh token é de uso único e o
+servidor o troca por um novo cookie e access token.
+
+## Testes automatizados
+
+Com o PostgreSQL ativo e as migrações aplicadas, rode `npm test` na pasta
+`backend`. A suíte contém testes unitários de tokens e testes HTTP de API que
+verificam login, renovação/rotação, logout, rotas protegidas e isolamento das
+assinaturas entre usuários. Os testes de API criam contas temporárias e as
+removem ao terminar.
+
 ## Rotas
 
-Tudo exige `Authorization: Bearer <token>`, exceto `/health`,
-`/api/auth/register` e `/api/auth/login`.
+Rotas de perfil, assinaturas e orçamentos exigem autenticação Bearer. Saúde,
+documentação, cadastro e login são públicos; renovação e logout usam o cookie
+HttpOnly de refresh.
 
 ```
 GET    /health
 
-POST   /api/auth/register          { nome, email, password } → { token, user }
-POST   /api/auth/login             { email, password }       → { token, user }
+POST   /api/auth/register          { nome, email, password } → { accessToken, user }
+POST   /api/auth/login             { email, password }       → { accessToken, user }
+POST   /api/auth/refresh            cookie HttpOnly           → { accessToken }
+POST   /api/auth/logout             cookie HttpOnly           → 204
 GET    /api/auth/me
 PATCH  /api/auth/me                { nome?, telefone?, paymentMethod? }
 
@@ -97,13 +119,13 @@ PUT    /api/budgets                { "Streaming": 150 }  (parcial)
 Erros voltam como `{ "error": "mensagem" }`; erros de validação trazem
 também `"details": [{ "campo": "password", "mensagem": "..." }]`.
 
-## Testando
+## Exemplos manuais
 
 ```bash
 # 1) sobe?
 curl -s http://localhost:3001/health
 
-# 2) login → copie o "token" da resposta
+# 2) login → copie o "accessToken" da resposta
 curl -s -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"teste@subtracker.com","password":"123456"}'
@@ -125,49 +147,26 @@ docker exec -it subtracker-postgres psql -U subtracker -d subtracker \
   -c "select email from users;" -c "select count(*) from subscriptions;"
 ```
 
-## O que foi e o que NÃO foi verificado
-
-Este código foi escrito num ambiente **sem acesso ao npm**, então o primeiro
-`npm install`, o `prisma migrate` e o Docker precisam ser feitos por você.
-O que foi conferido lá:
-
-- **Tipos:** `tsc` limpo sobre o `shared` e o backend, com os tipos reais do
-  Zod; Express, Prisma, JWT e bcrypt entraram só como declarações mínimas
-  escritas à mão.
-- **Comportamento (30 testes):** schemas do `shared` com Zod real, o
-  `shared` ligado por link no `node_modules` como o npm faz com `file:`,
-  controllers, `requireAuth`, `errorHandler` e as classes de repositório
-  Prisma — estas últimas contra um cliente Prisma falso, para checar a
-  lógica (filtro por `userId`, PATCH parcial, tradução de erros). Os
-  testes não foram incluídos no repositório.
-- **Não verificado:** o Prisma contra um Postgres de verdade (incluindo a
-  query de `WITH_HISTORY` e o `upsert` por chave composta), `bcryptjs` e
-  `jsonwebtoken` reais, e o Express subindo. Se algo falhar, o primeiro
-  erro costuma ser de ambiente (veja abaixo).
-
 ### Problemas comuns
 
 | Sintoma | Causa / solução |
 |---|---|
 | `Cannot find module 'zod'` vindo de `shared/` | o `npm install` de dentro de `shared/` não rodou: `cd ../shared && npm install` |
 | `@prisma/client did not initialize yet` | `npx prisma generate` |
-| `Can't reach database server at localhost:5432` | Docker fechado ou `npm run db:up` não rodou; ou já existe outro Postgres na porta 5432 (troque `5432:5432` no `docker-compose.yml` e a porta no `DATABASE_URL`) |
+| `Can't reach database server at localhost:5433` | Docker fechado ou `npm run db:up` não rodou; confira se a `DATABASE_URL` usa `localhost:5433` e o usuário/senha do Compose |
 | `Variável de ambiente JWT_SECRET não foi definida` | falta criar o `.env` |
 | CORS bloqueando o frontend | `FRONTEND_URL` no `.env` precisa ser a origem exata do Vite (`http://localhost:5173`) |
 
-## Decisões e próximos passos
+## Notas de segurança
 
-- **Senha:** o mínimo é o mesmo do formulário atual (4 caracteres), definido
-  em `shared/src/constants.ts` (`PASSWORD_MIN_LENGTH`) — endurecer é mudar um número.
-- **Contrato em aberto:** na aula, o frontend não muda porque o contrato
-  (método, caminho, corpo, id) é o mesmo nos dois bancos. Aqui o contrato
-  difere do json-server de propósito (`/api/subscriptions`, token em vez de
-  `?userId=`). Se for preferível o frontend não mudar nada, dá para expor
-  também `/subs` e `/users` com o formato antigo — ao custo de perder a
-  proteção por token.
-- **Ligar o frontend** ao `shared` e depois a esta API: passos em `../shared/README.md`.
-- **Esqueci minha senha de verdade** (token por e-mail) precisa de um
-  provedor de e-mail e uma tabela de tokens; fora desta base.
-- **Testes automatizados** dentro do repositório (ex.: Vitest).
+- O refresh token é `HttpOnly`, tem chave de assinatura separada derivada do
+  `JWT_SECRET`, é armazenado no banco por identificador e só pode ser usado
+  uma vez. O logout e a redefinição demonstrativa de senha revogam sessões.
+- Em produção, configure `JWT_SECRET` com um valor aleatório forte, defina
+  `JWT_REFRESH_SECRET` com outra chave forte, sirva a aplicação por HTTPS e
+  use `NODE_ENV=production` para habilitar o atributo `Secure` do cookie.
+- `ENABLE_DEMO_PASSWORD_RESET=true` permite redefinir uma senha apenas com o
+  e-mail e é **somente para demonstração local**. Mantenha desabilitado em
+  produção até implementar confirmação por e-mail.
 - `start` usa `tsx` (o `shared` é TypeScript sem build); para produção
-  de verdade valeria empacotar o `shared` ou usar um bundler.
+  valeria empacotar o `shared` ou usar um bundler.

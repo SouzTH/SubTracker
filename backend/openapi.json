@@ -1,0 +1,393 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SubTracker API",
+    "version": "1.0.0",
+    "description": "API de autenticação, assinaturas e orçamentos do SubTracker."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Desenvolvimento local"
+    }
+  ],
+  "tags": [
+    { "name": "Health" },
+    { "name": "Autenticação" },
+    { "name": "Assinaturas" },
+    { "name": "Orçamentos" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Verifica se a API está disponível",
+        "responses": {
+          "200": {
+            "description": "API disponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "status": { "type": "string", "example": "ok" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Autenticação"],
+        "summary": "Cria uma conta e inicia uma sessão",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["nome", "email", "password"],
+                "properties": {
+                  "nome": { "type": "string", "example": "Ana Silva" },
+                  "email": { "type": "string", "format": "email", "example": "ana@example.com" },
+                  "password": { "type": "string", "format": "password", "minLength": 4 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/AuthResponse" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Autenticação"],
+        "summary": "Autentica e inicia uma sessão",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "format": "password" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/AuthResponse" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": ["Autenticação"],
+        "summary": "Troca o refresh token HttpOnly por um novo par rotacionado",
+        "security": [{ "refreshCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "Token de acesso renovado; um novo refresh cookie é definido",
+            "headers": {
+              "Set-Cookie": {
+                "schema": { "type": "string" },
+                "description": "Cookie HttpOnly subtracker_refresh rotacionado"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["accessToken"],
+                  "properties": { "accessToken": { "type": "string" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["Autenticação"],
+        "summary": "Revoga a sessão de renovação e remove o cookie",
+        "security": [{ "refreshCookie": [] }],
+        "responses": { "204": { "description": "Sessão encerrada" } }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": ["Autenticação"],
+        "summary": "Retorna o usuário autenticado",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Usuário atual",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "patch": {
+        "tags": ["Autenticação"],
+        "summary": "Atualiza o perfil do usuário autenticado",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nome": { "type": "string" },
+                  "telefone": { "type": "string", "nullable": true },
+                  "paymentMethod": { "type": "string", "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Perfil atualizado" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "tags": ["Autenticação"],
+        "summary": "Redefine a senha no fluxo demonstrativo",
+        "description": "Disponível somente quando ENABLE_DEMO_PASSWORD_RESET=true. Não é recuperação de senha segura para produção.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "format": "password", "minLength": 4 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Senha redefinida" },
+          "403": { "description": "Fluxo demonstrativo desabilitado" }
+        }
+      }
+    },
+    "/api/subscriptions": {
+      "get": {
+        "tags": ["Assinaturas"],
+        "summary": "Lista as assinaturas do usuário autenticado",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Assinaturas",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Subscription" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Assinaturas"],
+        "summary": "Cria uma assinatura para o usuário autenticado",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SubscriptionInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Assinatura criada" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/subscriptions/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "get": {
+        "tags": ["Assinaturas"],
+        "summary": "Obtém uma assinatura própria",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Assinatura" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "Assinatura não encontrada" }
+        }
+      },
+      "patch": {
+        "tags": ["Assinaturas"],
+        "summary": "Atualiza uma assinatura própria",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionInput" } }
+          }
+        },
+        "responses": {
+          "200": { "description": "Assinatura atualizada" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "Assinatura não encontrada" }
+        }
+      },
+      "delete": {
+        "tags": ["Assinaturas"],
+        "summary": "Remove uma assinatura própria",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "204": { "description": "Assinatura removida" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "Assinatura não encontrada" }
+        }
+      }
+    },
+    "/api/budgets": {
+      "get": {
+        "tags": ["Orçamentos"],
+        "summary": "Lista os orçamentos do usuário autenticado",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Orçamentos por categoria" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "put": {
+        "tags": ["Orçamentos"],
+        "summary": "Atualiza os orçamentos do usuário autenticado",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": { "type": "number", "minimum": 0 }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Orçamentos atualizados" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "refreshCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "subtracker_refresh"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "nome": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "telefone": { "type": "string", "nullable": true },
+          "paymentMethod": { "type": "string", "nullable": true }
+        }
+      },
+      "SubscriptionInput": {
+        "type": "object",
+        "required": ["name", "category", "value", "period", "nextCharge", "paymentMethod"],
+        "properties": {
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "value": { "type": "number", "exclusiveMinimum": 0 },
+          "period": { "type": "string" },
+          "nextCharge": { "type": "string", "format": "date" },
+          "paymentMethod": { "type": "string" },
+          "status": { "type": "string" },
+          "color": { "type": "string" },
+          "icon": { "type": "string" },
+          "history": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "Subscription": {
+        "allOf": [
+          { "$ref": "#/components/schemas/SubscriptionInput" },
+          {
+            "type": "object",
+            "required": ["id"],
+            "properties": { "id": { "type": "string" } }
+          }
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      }
+    },
+    "responses": {
+      "AuthResponse": {
+        "description": "Sessão iniciada; o refresh token é definido como cookie HttpOnly",
+        "headers": {
+          "Set-Cookie": {
+            "schema": { "type": "string" },
+            "description": "Cookie HttpOnly subtracker_refresh"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["accessToken", "user"],
+              "properties": {
+                "accessToken": { "type": "string" },
+                "user": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Autenticação ausente, inválida ou expirada",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "BadRequest": {
+        "description": "Dados inválidos",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Conflict": {
+        "description": "E-mail já cadastrado",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  }
+}

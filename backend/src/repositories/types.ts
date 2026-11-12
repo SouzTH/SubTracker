@@ -66,6 +66,12 @@ export interface UserRepository {
   resetPassword(id: string, passwordHash: string): Promise<User | null>;
 }
 
+export interface RefreshSessionRepository {
+  create(jti: string, userId: string, expiresAt: Date): Promise<void>;
+  consume(jti: string, userId: string, now: Date): Promise<boolean>;
+  revokeAllForUser(userId: string): Promise<void>;
+}
+
 // Todos os métodos recebem `userId`: o isolamento entre contas é
 // responsabilidade da camada de dados, não de quem chama.
 export interface SubscriptionRepository {
@@ -86,6 +92,7 @@ export interface BudgetRepository {
 
 export interface Repositories {
   users: UserRepository;
+  refreshSessions: RefreshSessionRepository;
   subscriptions: SubscriptionRepository;
   budgets: BudgetRepository;
 }

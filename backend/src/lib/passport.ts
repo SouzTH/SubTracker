@@ -9,7 +9,7 @@ import passport from "passport";
 import { ExtractJwt, Strategy as JwtStrategy } from "passport-jwt";
 import { repositories } from "../repositories";
 import { env } from "./env";
-import type { TokenPayload } from "./jwt";
+import type { AccessTokenPayload } from "./jwt";
 
 passport.use(
   new JwtStrategy(
@@ -17,8 +17,13 @@ passport.use(
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: env.jwtSecret,
     },
-    async (payload: TokenPayload, done) => {
+    async (payload: AccessTokenPayload, done) => {
       try {
+        if (payload.tokenUse !== "access") {
+          done(null, false);
+          return;
+        }
+
         // Token válido mas de uma conta que foi apagada → não autentica.
         const user = await repositories.users.findById(payload.userId);
         done(null, user ? { userId: user.id } : false);

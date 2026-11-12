@@ -12,9 +12,15 @@ export class ApiError extends Error {
 }
 
 export interface AuthResponse {
-  token: string;
+  accessToken: string;
   user: CurrentUser;
 }
+
+interface RefreshResponse {
+  accessToken: string;
+}
+
+let refreshInProgress: Promise<string | null> | null = null;
 
 export function getStoredToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -39,6 +45,45 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
+async function renewAccessToken(): Promise<string | null> {
+  if (refreshInProgress) {
+    return refreshInProgress;
+  }
+
+  refreshInProgress = (async () => {
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      throw new ApiError("Não foi possível renovar a sessão. Verifique se a API está em execução.", 0);
+    }
+
+    if (!response.ok) {
+      clearSession();
+      return null;
+    }
+
+    const payload = (await response.json()) as RefreshResponse;
+    const user = getStoredUser();
+    if (!payload.accessToken || !user) {
+      clearSession();
+      return null;
+    }
+
+    saveSession(payload.accessToken, user);
+    return payload.accessToken;
+  })();
+
+  try {
+    return await refreshInProgress;
+  } finally {
+    refreshInProgress = null;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has("Content-Type") && !(init?.body instanceof FormData)) {
@@ -50,14 +95,36 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
-      headers,
-    });
-  } catch {
-    throw new ApiError("Não foi possível conectar ao servidor. Verifique se a API está em execução.", 0);
+  const canRefresh = ![
+    "/auth/login",
+    "/auth/register",
+    "/auth/refresh",
+    "/auth/logout",
+  ].some((authPath) => path.startsWith(authPath));
+
+  const send = async () => {
+    try {
+      return await fetch(`${API_BASE_URL}${path}`, {
+        ...init,
+        headers,
+        credentials: "include",
+      });
+    } catch {
+      throw new ApiError("Não foi possível conectar ao servidor. Verifique se a API está em execução.", 0);
+    }
+  };
+
+  let response = await send();
+  if (response.status === 401 && canRefresh && getStoredToken()) {
+    const renewedToken = await renewAccessToken();
+    if (renewedToken) {
+      headers.set("Authorization", `Bearer ${renewedToken}`);
+      response = await send();
+    }
+  }
+
+  if (response.status === 401 && canRefresh) {
+    clearSession();
   }
 
   let payload: any = null;
@@ -72,9 +139,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const message = payload?.error ?? payload?.message ?? `Falha na requisição (HTTP ${response.status}).`;
-    if (response.status === 401) {
-      clearSession();
-    }
     throw new ApiError(message, response.status);
   }
 
@@ -83,6 +147,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return payload as T;
+}
+
+export async function logoutUser() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      throw new ApiError(`Não foi possível encerrar a sessão (HTTP ${response.status}).`, response.status);
+    }
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError("Não foi possível conectar ao servidor para encerrar a sessão.", 0);
+  } finally {
+    clearSession();
+  }
 }
 
 export interface StoredUser extends CurrentUser {

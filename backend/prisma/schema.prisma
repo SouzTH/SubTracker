@@ -34,13 +34,26 @@ model User {
   // Metas por categoria (teto orçamentário), uma linha por categoria
   // personalizada. Categorias que o usuário nunca editou não têm linha: o
   // repositório completa com DEFAULT_BUDGETS na leitura (shared/constants).
-  budgets       Budget[]
-  subscriptions Subscription[]
+  budgets         Budget[]
+  subscriptions   Subscription[]
+  refreshSessions RefreshSession[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
+}
+
+model RefreshSession {
+  jti       String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_sessions")
 }
 
 model Budget {

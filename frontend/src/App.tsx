@@ -18,6 +18,7 @@ import {
   getStoredToken,
   getStoredUser as readStoredUser,
   getSubsByUser,
+  logoutUser,
   saveSession,
 } from "./lib/api";
 
@@ -238,6 +239,9 @@ function Painel() {
   };
 
   const handleLogout = () => {
+    void logoutUser().catch((error: unknown) => {
+      console.error("Não foi possível revogar a sessão no servidor.", error);
+    });
     clearSession();
     queryClient.clear();
     setUser(null);
