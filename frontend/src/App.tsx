@@ -227,7 +227,7 @@ function Painel() {
   // assinaturas — cada tela que precisa alterar dados invalida esta mesma
   // chave (subsQueryKey) depois de uma mutação, em vez de recebermos um
   // `setSubs` para atualizar manualmente.
-  const { data: subs = [] } = useQuery({
+  const { data: subs = [], isPending, isError, error } = useQuery({
     queryKey: subsQueryKey(user?.id),
     queryFn: () => getSubsByUser(),
     enabled: !!user,
@@ -287,7 +287,17 @@ function Painel() {
       <main className="flex-1 flex flex-col overflow-y-auto min-h-screen pb-20 md:pb-0">
         <div className="w-full max-w-full md:max-w-[1200px] mx-auto p-4 md:p-10">
           {screen === "dashboard" && (
-            <Dashboard subs={subs} navigate={navigate} budgets={user.budgets ?? DEFAULT_BUDGETS} userName={user.nome} />
+            isPending ? (
+              <p>Carregando assinaturas...</p>
+            ) : isError ? (
+              <p role="alert">
+                {error instanceof Error
+                  ? "Não foi possível carregar suas assinaturas."
+                  : "Ocorreu um erro ao carregar suas assinaturas."}
+              </p>
+            ) : (
+              <Dashboard subs={subs} navigate={navigate} budgets={user.budgets ?? DEFAULT_BUDGETS} userName={user.nome} />
+            )
           )}
           {screen === "add" && (
             <AddSubscription navigate={navigate} />

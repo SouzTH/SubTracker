@@ -133,26 +133,40 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     clearSession();
   }
 
-  let payload: any = null;
-  const text = await response.text();
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = text;
-    }
-  }
-
   if (!response.ok) {
-    const message = payload?.error ?? payload?.message ?? `Falha na requisição (HTTP ${response.status}).`;
+    const text = await response.text();
+    let message = `Falha na requisição (HTTP ${response.status}).`;
+    try {
+      const payload = JSON.parse(text) as { error?: unknown; message?: unknown };
+      if (typeof payload.error === "string") {
+        message = payload.error;
+      } else if (typeof payload.message === "string") {
+        message = payload.message;
+      } else if (text) {
+        message = text;
+      }
+    } catch {
+      if (text) {
+        message = text;
+      }
+    }
     throw new ApiError(message, response.status);
   }
 
-  if (response.status === 204 || payload === null || payload === undefined) {
+  if (response.status === 204) {
     return undefined as T;
   }
 
-  return payload as T;
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as T;
+  }
 }
 
 export async function logoutUser() {
