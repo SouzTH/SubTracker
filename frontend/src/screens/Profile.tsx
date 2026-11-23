@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
+import { queryClient } from "../lib/queryClient";
 import { personalInfoSchema, budgetsSchema, type PersonalInfoInput, type BudgetsInput } from "@subtracker/shared";
 import { CurrentUser, CategoryBudgets, DEFAULT_BUDGETS, Screen } from "../App";
 import { updateProfile, updateBudgets, ApiError } from "../lib/api";
@@ -44,12 +45,18 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
 
   const saveInfoMutation = useMutation({
     mutationFn: (values: PersonalInfoInput) => updateProfile(values),
-    onSuccess: (updatedUser, _values) => onUserUpdate(updatedUser),
+    onSuccess: async (updatedUser, _values) => {
+      onUserUpdate(updatedUser);
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
   });
 
   const saveBudgetsMutation = useMutation({
     mutationFn: (values: BudgetsInput) => updateBudgets(values),
-    onSuccess: (updatedBudgets) => onUserUpdate({ ...user, budgets: updatedBudgets as CategoryBudgets }),
+    onSuccess: async (updatedBudgets) => {
+      onUserUpdate({ ...user, budgets: updatedBudgets as CategoryBudgets });
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
   });
 
   const errorMessage = (error: unknown, fallback: string) =>

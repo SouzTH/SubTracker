@@ -171,7 +171,11 @@ export default function Dashboard({ subs, navigate, budgets, userName }: Props) 
           Próximas cobranças
         </p>
         <div className="flex flex-col gap-2.5">
-          {sorted.map((sub) => {
+          {subs.length === 0 ? (
+            <p className="text-sm text-muted-foreground font-body">
+              Nenhuma assinatura cadastrada ainda.
+            </p>
+          ) : sorted.map((sub) => {
             const days = daysUntil(sub.nextCharge)
             const urgent = days <= 3
             return (
