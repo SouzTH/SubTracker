@@ -47,7 +47,7 @@ requisição → routes → middleware (requireAuth) → controllers → reposit
 
 ## Como rodar
 
-Pré-requisitos: **Node 20+** e **Docker Desktop** aberto.
+Pré-requisitos: **Node.js 20.19+ ou 22.12+** e **Docker Desktop** aberto.
 
 ```bash
 cd backend
@@ -117,8 +117,9 @@ removem ao terminar.
 ## Rotas
 
 Rotas de perfil, assinaturas e orçamentos exigem autenticação Bearer. Saúde,
-documentação, cadastro e login são públicos; renovação e logout usam o cookie
-HttpOnly de refresh.
+documentação, cadastro, login e os endpoints de solicitação e conclusão de
+redefinição de senha são públicos; renovação e logout usam o cookie HttpOnly
+de refresh.
 
 ```
 GET    /health

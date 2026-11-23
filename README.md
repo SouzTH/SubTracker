@@ -18,21 +18,21 @@ Projeto desenvolvido para a disciplina de Programação de Software Web.
 | **Nova / Editar Subscrição** | Cadastro (em dois passos: escolha do serviço e detalhes) e edição de assinaturas — valor, periodicidade, data da próxima cobrança, categoria e forma de pagamento. Validado com Zod via `react-hook-form`. |
 | **Detalhes da Assinatura** | Histórico de pagamentos, projeção anual de custos, confirmação do pagamento do ciclo atual (atualiza histórico e recalcula a próxima cobrança), pausar/reativar, atalho para cancelar no provedor, editar e excluir o registo. |
 | **Relatórios** | Gráfico (donut) da distribuição de despesas ativas por categoria, ranking das 3 assinaturas mais caras e resumo financeiro (mensal/anual). |
-| **Importar Fatura** | Leitura de arquivo `.csv` com identificação automática de serviços conhecidos. Cada lançamento encontrado é cruzado com as assinaturas já ativas do utilizador: se já existir, confirma o pagamento; se não existir, cadastra uma assinatura nova — nunca duplica. |
+| **Importar Fatura** | Leitura de arquivo `.csv` com identificação automática de serviços conhecidos. Cada lançamento é conciliado com as assinaturas ativas do utilizador; quando encontra uma assinatura ativa correspondente, confirma o pagamento e evita duplicá-la. |
 | **Meu Perfil** | Dados pessoais (nome, telefone, forma de pagamento padrão — nunca número de cartão real) e metas (orçamentos) por categoria de gasto, usadas pelo Dashboard. |
 
 ## Tecnologias
 
 * **React 19** + **Vite** + **TypeScript**
-* **Tailwind CSS** — estilização e responsividade (sem CSS manual nem media query escrita à mão)
+* **Tailwind CSS** — estilização dos componentes e responsividade; `src/index.css` define variáveis de tema e estilos base globais.
 * **react-hook-form** + **zod** — controlo e validação de todos os formulários
 * **@tanstack/react-query** — busca, cache e sincronização de dados com a API do backend
 * **react-router-dom** — rotas (`/`, `/cadastro`, `/esqueci-senha`, `/painel`)
-* **Express + Prisma + PostgreSQL** — API, persistência e autenticação do backend
+* **Node.js + Express + TypeScript + Prisma + PostgreSQL + Passport (estratégia JWT)** — API, persistência e autenticação do backend
 
 ## Como executar
 
-É necessário ter o [Node.js](https://nodejs.org/) (20+) e o Docker Desktop instalados.
+É necessário ter o [Node.js](https://nodejs.org/) 20.19+ ou 22.12+ e o Docker Desktop instalados.
 
 ```bash
 git clone https://github.com/SouzTH/SubTracker.git
@@ -40,15 +40,20 @@ cd SubTracker
 ```
 
 Configure e inicie a API e o PostgreSQL seguindo as instruções de
-[`backend/README.md`](./backend/README.md). Depois, em outro terminal:
+[`backend/README.md`](./backend/README.md). Depois, em outro terminal aberto na raiz
+do repositório `SubTracker`:
 
 ```bash
-cd SubTracker/frontend
+cd frontend
 npm install
 npm run dev
 ```
 *Abra o endereço exibido pelo Vite (normalmente `http://localhost:5173/`).*
 *No PowerShell, caso a execução de scripts esteja bloqueada, use `npm.cmd` no lugar de `npm`.*
+
+O arquivo `frontend/.env` é opcional. Se precisar apontar para outra API,
+configure `VITE_API_URL`; sem essa variável, o frontend usa
+`http://localhost:3001/api`.
 
 É possível criar uma conta pela tela de cadastro. O seed do backend também cria
 uma conta de teste; veja as credenciais em [`backend/README.md`](./backend/README.md).
@@ -71,7 +76,7 @@ SubTracker/
 ├── teste.csv               → extrato de exemplo para testar a importação
 ├── shared/                 → pacote @subtracker/shared: schemas Zod e constantes de domínio
 │                              para o frontend e o backend (ver shared/README.md)
-├── backend/                → API Express + Prisma + PostgreSQL + JWT (ver backend/README.md)
+├── backend/                → API Node.js + Express + TypeScript + Prisma + PostgreSQL + Passport/JWT (ver backend/README.md)
 └── frontend/
     └── src/
         ├── App.tsx           → rotas, estado principal e layout (sidebar/bottom nav)
@@ -96,8 +101,8 @@ SubTracker/
 ## Documentação
 
 A pasta [`documentacao/`](./documentacao) reúne:
-* **Prototipagem_SubTracker.md** — levantamento original de telas e casos de uso.
-* **Refinamento_da_Prototipagem_SubTracker.md** — matriz CRUD, priorização e o status de implementação de cada caso de uso (com justificativa para o que não entrou no escopo final).
+* [**Prototipagem_SubTracker.md**](./documentacao/Prototipagem_SubTracker.md) — levantamento original de telas e casos de uso.
+* [**Refinamento_da_Prototipagem_SubTracker.md**](./documentacao/Refinamento_da_Prototipagem_SubTracker.md) — matriz CRUD, priorização e o status de implementação de cada caso de uso (com justificativa para o que não entrou no escopo final).
 * **Manual.md** — instalação, operação e manual do usuário.
 * **Cronograma.md** — planeamento e acompanhamento das entregas.
 
@@ -105,4 +110,4 @@ A pasta [`documentacao/`](./documentacao) reúne:
 
 * O envio de recuperação de senha depende da configuração SMTP descrita em `backend/README.md`.
 * A importação de CSV depende da estrutura fixa (`data,descricao,valor`).
-* O catálogo de serviços reconhecidos na importação e no cadastro é uma lista fixa no código (`src/constants/catalog.ts`), não uma área administrativa com CRUD próprio — ver justificativa de escopo em `Refinamento_da_Prototipagem_SubTracker.md`.
+* O catálogo de serviços usado no cadastro é uma lista fixa em `src/constants/catalog.ts`, não uma área administrativa com CRUD próprio. A importação usa regras próprias de detecção em `src/screens/ImportStatement.tsx` — ver justificativa de escopo em [`Refinamento_da_Prototipagem_SubTracker.md`](./documentacao/Refinamento_da_Prototipagem_SubTracker.md).
