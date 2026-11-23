@@ -129,7 +129,7 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
 
             {saveInfoMutation.isError && (
               <p className="text-red-500 text-[13px] font-body">
-                {errorMessage(saveInfoMutation.error, "Não foi possível salvar seus dados. Verifique se o json-server está rodando.")}
+                {errorMessage(saveInfoMutation.error, "Não foi possível salvar seus dados. Verifique se a API está em execução.")}
               </p>
             )}
 
@@ -170,7 +170,7 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
 
             {saveBudgetsMutation.isError && (
               <p className="text-red-500 text-[13px] font-body">
-                {errorMessage(saveBudgetsMutation.error, "Não foi possível salvar suas metas. Verifique se o json-server está rodando.")}
+                {errorMessage(saveBudgetsMutation.error, "Não foi possível salvar suas metas. Verifique se a API está em execução.")}
               </p>
             )}
 

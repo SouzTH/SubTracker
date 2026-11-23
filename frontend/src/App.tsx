@@ -260,18 +260,18 @@ function Painel() {
   if (!user) return null;
 
   return (
-    <div className="flex flex-col md:flex-row w-screen min-h-screen bg-background">
+    <div className="flex flex-col md:flex-row w-full min-h-screen bg-background">
 
       {/* Sidebar — só aparece a partir do breakpoint md (768px), via CSS puro */}
       <aside className="hidden md:flex w-[260px] bg-[rgba(8,14,29,0.95)] border-r border-[rgba(255,255,255,0.06)] flex-col py-6 px-4 justify-between h-screen sticky top-0">
         <div>
-          <div className="text-xl font-bold text-white mb-8 pl-3 font-heading">
+          <header className="text-xl font-bold text-white mb-8 pl-3 font-heading">
             Sub<span className="text-primary">Tracker</span>
-          </div>
+          </header>
           <DesktopNav screen={screen} navigate={navigate} />
         </div>
 
-        <div className="p-3 border-t border-[rgba(255,255,255,0.06)]">
+        <footer className="p-3 border-t border-[rgba(255,255,255,0.06)]">
           <p className="text-[13px] text-foreground font-semibold mb-2 overflow-hidden text-ellipsis whitespace-nowrap font-body">
             {user.nome}
           </p>
@@ -281,7 +281,7 @@ function Painel() {
           >
             Terminar Sessão
           </button>
-        </div>
+        </footer>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-y-auto min-h-screen pb-20 md:pb-0">
@@ -357,47 +357,49 @@ function DesktopNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen
 
 function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen) => void }) {
   return (
-    <div className="flex md:hidden fixed bottom-0 left-0 right-0 bg-[rgba(8,14,29,0.95)] backdrop-blur-[16px] border-t border-border justify-around items-center pt-3 px-4 pb-5 z-50">
-      {[
-        { key: "dashboard", icon: "⊞", label: "Início" },
-        { key: "add", icon: "+", label: "Adicionar" },
-        { key: "report", icon: "◎", label: "Relatório" },
-      ].map((item) => {
-        const active =
-          screen === item.key ||
-          (screen === "details" && item.key === "dashboard") ||
-          (screen === "edit" && item.key === "dashboard") ||
-          (screen === "import" && item.key === "dashboard") ||
-          (screen === "profile" && item.key === "dashboard");
+    <footer className="flex md:hidden fixed bottom-0 left-0 right-0 bg-[rgba(8,14,29,0.95)] backdrop-blur-[16px] border-t border-border pt-3 px-4 pb-5 z-50">
+      <nav aria-label="Navegação inferior" className="flex w-full justify-around items-center">
+        {[
+          { key: "dashboard", icon: "⊞", label: "Início" },
+          { key: "add", icon: "+", label: "Adicionar" },
+          { key: "report", icon: "◎", label: "Relatório" },
+        ].map((item) => {
+          const active =
+            screen === item.key ||
+            (screen === "details" && item.key === "dashboard") ||
+            (screen === "edit" && item.key === "dashboard") ||
+            (screen === "import" && item.key === "dashboard") ||
+            (screen === "profile" && item.key === "dashboard");
 
-        if (item.key === "add") {
+          if (item.key === "add") {
+            return (
+              <button
+                key={item.key}
+                onClick={() => navigate(item.key as Screen)}
+                className="flex items-center gap-1.5 bg-primary text-primary-foreground border-none rounded-xl py-2.5 px-5 cursor-pointer shadow-[0_4px_12px_rgba(0,212,170,0.3)]"
+              >
+                <span className="text-xl font-bold">{item.icon}</span>
+                <span className="text-sm font-bold font-body">{item.label}</span>
+              </button>
+            );
+          }
+
           return (
             <button
               key={item.key}
               onClick={() => navigate(item.key as Screen)}
-              className="flex items-center gap-1.5 bg-primary text-primary-foreground border-none rounded-xl py-2.5 px-5 cursor-pointer shadow-[0_4px_12px_rgba(0,212,170,0.3)]"
+              className={`flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-3 transition-colors ${
+                active ? "text-primary" : "text-muted-foreground"
+              }`}
             >
-              <span className="text-xl font-bold">{item.icon}</span>
-              <span className="text-sm font-bold font-body">{item.label}</span>
+              <span className="text-xl leading-none">{item.icon}</span>
+              <span className={`text-[11px] font-body ${active ? "font-semibold" : "font-normal"}`}>
+                {item.label}
+              </span>
             </button>
           );
-        }
-
-        return (
-          <button
-            key={item.key}
-            onClick={() => navigate(item.key as Screen)}
-            className={`flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-3 transition-colors ${
-              active ? "text-primary" : "text-muted-foreground"
-            }`}
-          >
-            <span className="text-xl leading-none">{item.icon}</span>
-            <span className={`text-[11px] font-body ${active ? "font-semibold" : "font-normal"}`}>
-              {item.label}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+        })}
+      </nav>
+    </footer>
   );
 }

@@ -6,7 +6,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "server": "json-server --watch db.json --port 3000",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview"
@@ -31,7 +30,6 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
-    "json-server": "^1.0.0-beta.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.6"
   }

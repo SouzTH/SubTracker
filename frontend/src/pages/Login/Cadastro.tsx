@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
@@ -100,13 +100,12 @@ export function Register() {
                     <div className="text-center mt-6 text-sm font-body text-muted-foreground">
                         <p>
                             Já tem uma conta?{' '}
-                            <a
-                                href="#"
+                            <Link
+                                to="/"
                                 className="text-primary font-semibold no-underline"
-                                onClick={(e) => { e.preventDefault(); navigate('/'); }}
                             >
                                 Faça Login
-                            </a>
+                            </Link>
                         </p>
                     </div>
                 </form>
