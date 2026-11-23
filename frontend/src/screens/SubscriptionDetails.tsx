@@ -4,6 +4,7 @@ import { updateSub, deleteSub } from "../lib/api";
 import { subsQueryKey } from "../lib/queryClient";
 import { CANCEL_URLS } from "../constants/catalog";
 import { fmt, toMonthlyValue } from "../lib/money";
+import { getSubscriptionColorClasses } from "../lib/subscriptionColorClasses";
 
 interface Props {
   sub: Subscription;
@@ -25,6 +26,7 @@ function formatDate(iso: string) {
 export default function SubscriptionDetails({ sub, navigate }: Props) {
   const queryClient = useQueryClient();
   const user = getStoredUser();
+  const historyKeyOccurrences = new Map<string, number>();
   const invalidate = () => queryClient.invalidateQueries({ queryKey: subsQueryKey(user?.id) });
 
   const pauseMutation = useMutation({
@@ -68,10 +70,7 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Header with gradient */}
-      <div
-        className="pt-14 px-6 pb-6 border-b border-border"
-        style={{ background: `linear-gradient(160deg, ${sub.color}28 0%, transparent 60%)` }}
-      >
+      <div className={`pt-14 px-6 pb-6 border-b border-border ${getSubscriptionColorClasses(sub.color).detailHeader}`}>
         <div className="flex items-center gap-[14px] mb-6">
           <button
             onClick={() => navigate("dashboard")}
@@ -85,10 +84,7 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
         </div>
 
         <div className="flex items-center gap-[18px]">
-          <div
-            className="w-[72px] h-[72px] rounded-lg flex items-center justify-center text-4xl border-[1.5px]"
-            style={{ background: `${sub.color}22`, borderColor: `${sub.color}44` }}
-          >
+          <div className={`w-[72px] h-[72px] rounded-lg flex items-center justify-center text-4xl border-[1.5px] ${getSubscriptionColorClasses(sub.color).iconBackground} ${getSubscriptionColorClasses(sub.color).iconBorder}`}>
             {sub.icon}
           </div>
           <div>
@@ -121,10 +117,7 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
         </div>
 
         {/* Annual projection */}
-        <div
-          className="border rounded-md py-4 px-5 flex justify-between items-center mb-6"
-          style={{ background: `${sub.color}12`, borderColor: `${sub.color}30` }}
-        >
+        <div className={`border rounded-md py-4 px-5 flex justify-between items-center mb-6 ${getSubscriptionColorClasses(sub.color).projection}`}>
           <div>
             <p className="text-xs text-muted-foreground font-body mb-1">
               Projeção anual
@@ -133,10 +126,7 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
               {fmt(toMonthlyValue(sub) * 12)}
             </p>
           </div>
-          <div
-            className="w-11 h-11 rounded-[14px] flex items-center justify-center text-[22px]"
-            style={{ background: `${sub.color}22` }}
-          >
+          <div className={`w-11 h-11 rounded-[14px] flex items-center justify-center text-[22px] ${getSubscriptionColorClasses(sub.color).iconBackground}`}>
             📊
           </div>
         </div>
@@ -152,35 +142,40 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {sub.history.map((h, i) => (
-                <div key={i} className="bg-card rounded-[14px] py-[14px] px-4 flex items-center justify-between border border-border">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center text-base ${
-                      h.status === "Pago" ? "bg-primary/12" : "bg-amber-500/12"
-                    }`}>
-                      {h.status === "Pago" ? "✓" : "⏳"}
+              {sub.history.map((h) => {
+                const historyKey = `${h.date}-${h.status}-${h.value}`;
+                const occurrence = historyKeyOccurrences.get(historyKey) ?? 0;
+                historyKeyOccurrences.set(historyKey, occurrence + 1);
+                return (
+                  <div key={`${historyKey}-${occurrence}`} className="bg-card rounded-[14px] py-[14px] px-4 flex items-center justify-between border border-border">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center text-base ${
+                        h.status === "Pago" ? "bg-primary/12" : "bg-amber-500/12"
+                      }`}>
+                        {h.status === "Pago" ? "✓" : "⏳"}
+                      </div>
+                      <div>
+                        <p className="font-heading font-semibold text-sm mb-0.5">
+                          {new Date(h.date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-body">
+                          {new Date(h.date + "T00:00:00").getFullYear()}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-heading font-semibold text-sm mb-0.5">
-                        {new Date(h.date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}
+                    <div className="text-right">
+                      <p className="font-heading font-bold text-[15px] mb-1">
+                        {fmt(h.value)}
                       </p>
-                      <p className="text-xs text-muted-foreground font-body">
-                        {new Date(h.date + "T00:00:00").getFullYear()}
-                      </p>
+                      <span className={`text-[11px] py-0.5 px-2 rounded-[10px] font-body ${
+                        h.status === "Pago" ? "bg-primary/15 text-primary" : "bg-amber-500/15 text-amber-500"
+                      }`}>
+                        {h.status}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-heading font-bold text-[15px] mb-1">
-                      {fmt(h.value)}
-                    </p>
-                    <span className={`text-[11px] py-0.5 px-2 rounded-[10px] font-body ${
-                      h.status === "Pago" ? "bg-primary/15 text-primary" : "bg-amber-500/15 text-amber-500"
-                    }`}>
-                      {h.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

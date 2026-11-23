@@ -1,9 +1,9 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { loginSchema, LoginFormValues } from '../../schemas/auth';
-import { findUsersByEmail, ApiError } from '../../lib/api';
+import { loginSchema, type LoginInput } from '@subtracker/shared';
+import { ApiError, loginUser, saveSession } from '../../lib/api';
 
 export function Login() {
     const navigate = useNavigate();
@@ -13,35 +13,24 @@ export function Login() {
         handleSubmit,
         formState: { errors },
         setError,
-    } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) });
+    } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
 
     const loginMutation = useMutation({
-        mutationFn: async ({ email, password }: LoginFormValues) => {
-            // Busca por email e confere a senha no cliente, para não depender
-            // da comparação de tipos que o json-server faz na query string.
-            const users = await findUsersByEmail(email);
-            const match = users.find((u) => u.email === email && u.password === password);
-            if (!match) throw new ApiError('Email ou senha incorretos.');
-            return match;
-        },
-        onSuccess: (match) => {
-            // Não guarda a senha no localStorage — só o que a interface precisa.
-            const { password: _senha, ...safeUser } = match;
-            localStorage.setItem('subtracker_user', JSON.stringify(safeUser));
+        mutationFn: async ({ email, password }: LoginInput) => loginUser({ email, password }),
+        onSuccess: ({ accessToken, user }) => {
+            saveSession(accessToken, user);
             navigate('/painel');
         },
         onError: (error) => {
-            if (error instanceof ApiError && error.message === 'Email ou senha incorretos.') {
-                setError('root', { message: error.message });
-            } else {
-                setError('root', {
-                    message: 'Não foi possível conectar ao servidor. Verifique se o json-server está rodando (npm run server).',
-                });
-            }
+            const message =
+                error instanceof ApiError && error.message
+                    ? error.message
+                    : 'Não foi possível conectar ao servidor. Verifique se a API está em execução.';
+            setError('root', { message });
         },
     });
 
-    const onSubmit = (values: LoginFormValues) => loginMutation.mutate(values);
+    const onSubmit = (values: LoginInput) => loginMutation.mutate(values);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -94,22 +83,20 @@ export function Login() {
                     <div className="text-center mt-6 text-sm font-body text-muted-foreground">
                         <p>
                             Não tem uma conta?{' '}
-                            <a
-                                href="#"
+                            <Link
+                                to="/cadastro"
                                 className="text-primary font-semibold no-underline"
-                                onClick={(e) => { e.preventDefault(); navigate('/cadastro'); }}
                             >
                                 Cadastre-se
-                            </a>
+                            </Link>
                         </p>
                         <p className="mt-2.5">
-                            <a
-                                href="#"
+                            <Link
+                                to="/esqueci-senha"
                                 className="text-primary font-semibold no-underline"
-                                onClick={(e) => { e.preventDefault(); navigate('/esqueci-senha'); }}
                             >
                                 Esqueceu a senha?
-                            </a>
+                            </Link>
                         </p>
                     </div>
                 </form>

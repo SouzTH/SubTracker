@@ -10,4 +10,5 @@ export const subscriptionSchema = z.object({
   nextCharge: z.string().min(1, "Informe a data da próxima cobrança"),
   paymentMethod: z.string().min(1, "Escolha a forma de pagamento"),
 });
-export type SubscriptionFormValues = z.infer<typeof subscriptionSchema>;
+export type SubscriptionFormInput = z.input<typeof subscriptionSchema>;
+export type SubscriptionFormValues = z.output<typeof subscriptionSchema>;

@@ -1,11 +1,13 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
+import { queryClient } from "../lib/queryClient";
+import { personalInfoSchema, budgetsSchema, type PersonalInfoInput, type BudgetsInput } from "@subtracker/shared";
 import { CurrentUser, CategoryBudgets, DEFAULT_BUDGETS, Screen } from "../App";
-import { personalInfoSchema, PersonalInfoFormValues, budgetsSchema, BudgetsFormValues } from "../schemas/profile";
-import { updateUser, ApiError } from "../lib/api";
+import { updateProfile, updateBudgets, ApiError } from "../lib/api";
 import { PAYMENTS } from "../constants/payments";
 import { Field } from "../components/Field";
+import type { z } from "zod";
 
 interface Props {
   user: CurrentUser;
@@ -27,7 +29,7 @@ function saveButtonClass(busy: boolean) {
 }
 
 export default function Profile({ user, onUserUpdate, onLogout, navigate }: Props) {
-  const infoForm = useForm<PersonalInfoFormValues>({
+  const infoForm = useForm<PersonalInfoInput>({
     resolver: zodResolver(personalInfoSchema),
     defaultValues: {
       nome: user.nome,
@@ -36,19 +38,25 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
     },
   });
 
-  const budgetsForm = useForm<BudgetsFormValues>({
+  const budgetsForm = useForm<z.input<typeof budgetsSchema>, unknown, BudgetsInput>({
     resolver: zodResolver(budgetsSchema),
     defaultValues: user.budgets ?? DEFAULT_BUDGETS,
   });
 
   const saveInfoMutation = useMutation({
-    mutationFn: (values: PersonalInfoFormValues) => updateUser(user.id, values),
-    onSuccess: (_data, values) => onUserUpdate({ ...user, ...values }),
+    mutationFn: (values: PersonalInfoInput) => updateProfile(values),
+    onSuccess: async (updatedUser, _values) => {
+      onUserUpdate(updatedUser);
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
   });
 
   const saveBudgetsMutation = useMutation({
-    mutationFn: (values: BudgetsFormValues) => updateUser(user.id, { budgets: values }),
-    onSuccess: (_data, values) => onUserUpdate({ ...user, budgets: values }),
+    mutationFn: (values: BudgetsInput) => updateBudgets(values),
+    onSuccess: async (updatedBudgets) => {
+      onUserUpdate({ ...user, budgets: updatedBudgets as CategoryBudgets });
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
   });
 
   const errorMessage = (error: unknown, fallback: string) =>
@@ -80,12 +88,13 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
             noValidate
             className="flex flex-col gap-[14px]"
           >
-            <Field label="Nome" error={infoForm.formState.errors.nome?.message}>
-              <input type="text" className={`${baseInputClass} px-[14px]`} {...infoForm.register("nome")} />
+            <Field id="profile-name" label="Nome" error={infoForm.formState.errors.nome?.message}>
+              <input id="profile-name" type="text" className={`${baseInputClass} px-[14px]`} {...infoForm.register("nome")} />
             </Field>
 
-            <Field label="Email">
+            <Field id="profile-email" label="Email">
               <input
+                id="profile-email"
                 type="email"
                 value={user.email}
                 disabled
@@ -94,8 +103,9 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
               />
             </Field>
 
-            <Field label="Telefone (opcional)">
+            <Field id="profile-phone" label="Telefone (opcional)">
               <input
+                id="profile-phone"
                 type="tel"
                 placeholder="(00) 00000-0000"
                 className={`${baseInputClass} px-[14px]`}
@@ -103,8 +113,9 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
               />
             </Field>
 
-            <Field label="Forma de pagamento padrão" error={infoForm.formState.errors.paymentMethod?.message}>
+            <Field id="profile-payment-method" label="Forma de pagamento padrão" error={infoForm.formState.errors.paymentMethod?.message}>
               <select
+                id="profile-payment-method"
                 className={`${baseInputClass} px-[14px] appearance-none cursor-pointer [color-scheme:dark]`}
                 {...infoForm.register("paymentMethod")}
               >
@@ -121,7 +132,7 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
 
             {saveInfoMutation.isError && (
               <p className="text-red-500 text-[13px] font-body">
-                {errorMessage(saveInfoMutation.error, "Não foi possível salvar seus dados. Verifique se o json-server está rodando.")}
+                {errorMessage(saveInfoMutation.error, "Não foi possível salvar seus dados. Verifique se a API está em execução.")}
               </p>
             )}
 
@@ -144,12 +155,13 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
             className="flex flex-col gap-3"
           >
             {CATEGORIES.map((cat) => (
-              <Field key={cat} label={cat} error={budgetsForm.formState.errors[cat]?.message}>
+              <Field key={cat} id={`budget-${cat}`} label={cat} error={budgetsForm.formState.errors[cat]?.message}>
                 <div className="relative">
                   <span className="absolute left-[14px] top-1/2 -translate-y-1/2 font-heading font-semibold text-sm text-primary">
                     R$
                   </span>
                   <input
+                    id={`budget-${cat}`}
                     type="number"
                     min={0}
                     step="0.01"
@@ -162,7 +174,7 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
 
             {saveBudgetsMutation.isError && (
               <p className="text-red-500 text-[13px] font-body">
-                {errorMessage(saveBudgetsMutation.error, "Não foi possível salvar suas metas. Verifique se o json-server está rodando.")}
+                {errorMessage(saveBudgetsMutation.error, "Não foi possível salvar suas metas. Verifique se a API está em execução.")}
               </p>
             )}
 

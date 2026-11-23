@@ -2,11 +2,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Subscription, Screen, getStoredUser } from "../App";
-import { subscriptionSchema, SubscriptionFormValues, CATEGORY_VALUES, PERIOD_VALUES } from "../schemas/subscription";
+import { subscriptionSchema, SubscriptionFormInput, SubscriptionFormValues, CATEGORY_VALUES, PERIOD_VALUES } from "../schemas/subscription";
 import { updateSub, ApiError } from "../lib/api";
 import { subsQueryKey } from "../lib/queryClient";
 import { PAYMENTS } from "../constants/payments";
 import { Field } from "../components/Field";
+import { getSubscriptionColorClasses } from "../lib/subscriptionColorClasses";
 
 interface Props {
   sub: Subscription;
@@ -23,7 +24,7 @@ export default function EditSubscription({ sub, navigate }: Props) {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<SubscriptionFormValues>({
+  } = useForm<SubscriptionFormInput, unknown, SubscriptionFormValues>({
     resolver: zodResolver(subscriptionSchema),
     defaultValues: {
       category: sub.category,
@@ -66,10 +67,7 @@ export default function EditSubscription({ sub, navigate }: Props) {
       <form className="px-6" onSubmit={handleSubmit(onSubmit)} noValidate>
         {/* Card do Serviço Atual (Estático) */}
         <div className="flex items-center gap-[14px] bg-card rounded-md py-4 px-4 mb-6 border border-border">
-          <div
-            className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center text-[26px]"
-            style={{ background: `${sub.color}22` }}
-          >
+          <div className={`w-[52px] h-[52px] rounded-[14px] flex items-center justify-center text-[26px] ${getSubscriptionColorClasses(sub.color).iconBackground}`}>
             {sub.icon}
           </div>
           <div>
@@ -80,13 +78,14 @@ export default function EditSubscription({ sub, navigate }: Props) {
 
         <div className="flex flex-col gap-[18px]">
           {/* Valor */}
-          <Field label="Valor da assinatura" error={errors.value?.message}>
+          <Field id="subscription-value" label="Valor da assinatura" error={errors.value?.message}>
             <div className="relative">
               <span className="absolute left-[14px] top-1/2 -translate-y-1/2 font-heading font-semibold text-base text-primary">
                 R$
               </span>
               <input
                 type="number"
+                id="subscription-value"
                 step="0.01"
                 placeholder="0,00"
                 className="w-full box-border bg-card border border-border rounded-sm py-[14px] pr-[14px] pl-11 font-heading font-semibold text-lg text-foreground outline-none"
@@ -114,9 +113,10 @@ export default function EditSubscription({ sub, navigate }: Props) {
           </Field>
 
           {/* Próxima cobrança */}
-          <Field label="Próxima cobrança" error={errors.nextCharge?.message}>
+          <Field id="subscription-next-charge" label="Próxima cobrança" error={errors.nextCharge?.message}>
             <input
               type="date"
+              id="subscription-next-charge"
               className="w-full box-border bg-card border border-border rounded-sm p-[14px] font-body text-sm text-foreground outline-none [color-scheme:dark]"
               {...register("nextCharge")}
             />
@@ -143,8 +143,9 @@ export default function EditSubscription({ sub, navigate }: Props) {
           </Field>
 
           {/* Forma de Pagamento */}
-          <Field label="Forma de pagamento" error={errors.paymentMethod?.message}>
+          <Field id="subscription-payment-method" label="Forma de pagamento" error={errors.paymentMethod?.message}>
             <select
+              id="subscription-payment-method"
               className="w-full bg-card border border-border rounded-sm p-[14px] font-body text-sm text-foreground outline-none [color-scheme:dark] appearance-none cursor-pointer"
               {...register("paymentMethod")}
             >

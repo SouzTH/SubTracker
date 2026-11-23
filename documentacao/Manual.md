@@ -10,45 +10,35 @@ Este documento cobre três partes: **instalação** (como colocar o projeto para
 
 ### Pré-requisitos
 
-- [Node.js](https://nodejs.org/) versão 18 ou superior (inclui o `npm`).
+- [Node.js](https://nodejs.org/) versão 20 ou superior (inclui o `npm`).
 - Um navegador atual (Chrome, Edge, Firefox).
 - Git, para clonar o repositório.
+- Docker Desktop, para executar o PostgreSQL do backend.
 
 ### Passo a passo
 
-1. **Clone o repositório** e entre na pasta do frontend:
+1. **Clone o repositório** e entre na pasta do projeto:
 
    ```bash
    git clone https://github.com/SouzTH/SubTracker.git
-   cd SubTracker/frontend
+   cd SubTracker
    ```
 
-2. **Instale as dependências**:
+2. **Configure e inicie o backend e o PostgreSQL** seguindo o passo a passo
+   de [`backend/README.md`](../backend/README.md).
+
+3. **Instale as dependências do frontend**:
 
    ```bash
+   cd frontend
    npm install
-   ```
-
-   Isso instala o React, o Vite, o Tailwind CSS, o `react-hook-form`, o `zod`, o
-   `@tanstack/react-query` e o `json-server` (todos listados em `package.json`).
-
-3. **Suba os dois servidores em dois terminais separados** (os dois precisam
-   ficar rodando ao mesmo tempo):
-
-   ```bash
-   # Terminal 1 — API fake (json-server), na porta 3000
-   npm run server
-   ```
-
-   ```bash
-   # Terminal 2 — aplicação React (Vite), na porta 5173
    npm run dev
    ```
 
 4. **Acesse** [http://localhost:5173](http://localhost:5173) no navegador.
 
-5. **Faça login** com uma conta já existente em `db.json` (veja a seção
-   "Dados iniciais" abaixo) ou crie uma conta nova pelo link "Cadastre-se".
+5. **Crie uma conta** pelo link "Cadastre-se" ou use a conta de teste criada
+   pelo seed, conforme descrito em `backend/README.md`.
 
 ### Build de produção (opcional)
 
@@ -63,29 +53,23 @@ npm run preview  # serve o build gerado, para conferir
 
 ### Arquitetura
 
-O SubTracker é um projeto **só de frontend**. Ele não tem um backend "de
-verdade" — em vez disso, usa o [json-server](https://github.com/typicode/json-server),
-que transforma o arquivo `frontend/db.json` numa API REST fake (`GET`, `POST`,
-`PATCH`, `DELETE`) rodando em `http://localhost:3000`.
+O frontend React comunica-se com a API Express, que persiste os dados no
+PostgreSQL por meio do Prisma. Consulte `backend/README.md` para configurar e
+executar a API.
 
 ```
 SubTracker/
 ├── documentacao/        → documentos de prototipagem, refinamento e este manual
 ├── teste.csv             → extrato de exemplo para testar a importação
 └── frontend/
-    ├── db.json           → "banco de dados" usado pelo json-server
     ├── src/
     │   ├── App.tsx        → rotas, layout e estado principal da aplicação
-    │   ├── lib/
-    │   │   ├── api.ts         → todas as chamadas HTTP ao json-server, centralizadas
-    │   │   └── queryClient.ts → configuração do TanStack Query
-    │   ├── schemas/       → validações Zod usadas pelos formulários (react-hook-form)
-    │   ├── constants/     → catálogo de serviços e formas de pagamento (fonte única,
-    │   │                      evita repetir a mesma lista em várias telas)
-    │   ├── components/    → componentes pequenos reaproveitados entre telas (ex.: Field)
+    │   ├── lib/           → chamadas HTTP e configuração do TanStack Query
+    │   ├── schemas/       → validações Zod dos formulários
+    │   ├── constants/     → catálogo de serviços e formas de pagamento
+    │   ├── components/    → componentes pequenos reutilizados
     │   ├── pages/Login/   → telas de login, cadastro e recuperação de senha
-    │   └── screens/       → Dashboard, Nova Assinatura, Editar, Detalhes, Relatório,
-    │                          Importar Extrato e Perfil
+    │   └── screens/       → Dashboard, assinaturas, relatório, importação e perfil
     └── package.json
 ```
 
@@ -96,31 +80,16 @@ SubTracker/
 | React + Vite + TypeScript | Base da aplicação (ES6, componentes funcionais) |
 | Tailwind CSS | Estilização e responsividade (sem media query manual) |
 | `react-hook-form` + `zod` | Controle e validação dos formulários (login, cadastro, nova assinatura, perfil, etc.) |
-| `@tanstack/react-query` | Busca, cache e sincronização dos dados com o json-server (substitui `fetch` + `useState` manuais) |
-| `json-server` | Simula uma API REST a partir do `db.json` |
+| `@tanstack/react-query` | Busca, cache e sincronização dos dados com a API |
+| Express + Prisma + PostgreSQL | API e persistência de dados (veja `backend/README.md`) |
 | `react-router-dom` | Rotas (`/`, `/cadastro`, `/esqueci-senha`, `/painel`) |
-
-### Dados iniciais
-
-O `db.json` já vem com usuários de teste cadastrados, por exemplo:
-
-| Email | Senha |
-|---|---|
-| `admin@teste.com` | `1234` |
-
-Para **resetar os dados** para o estado inicial, basta restaurar o `db.json`
-a partir do histórico do Git (`git checkout -- frontend/db.json`) — ele é o
-único arquivo que muda enquanto o sistema é usado (novas assinaturas, novos
-usuários, pagamentos confirmados etc. são gravados nele pelo json-server).
 
 ### Problemas comuns
 
-- **"Erro de conexão ao servidor" no login** → o `npm run server` não está
-  rodando. Os dois terminais (servidor e frontend) precisam estar abertos ao
-  mesmo tempo.
-- **Porta 3000 ou 5173 já em uso** → feche outro processo usando a porta, ou
-  ajuste a porta no script `server` do `package.json` (e em `frontend/src/lib/api.ts`,
-  que tem a URL base).
+- **"Erro de conexão ao servidor" no login** → confira se a API está rodando
+  conforme as instruções de `backend/README.md`.
+- **Porta 3001 ou 5173 já em uso** → feche outro processo usando a porta, ou
+  configure a porta do Vite ou a URL da API conforme o ambiente.
 
 ---
 

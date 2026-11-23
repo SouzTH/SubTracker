@@ -1,5 +1,6 @@
 import { Subscription, Screen } from "../App";
 import { fmt, toMonthlyValue } from "../lib/money";
+import { getSubscriptionColorClasses } from "../lib/subscriptionColorClasses";
 
 interface Props {
   subs: Subscription[];
@@ -13,6 +14,33 @@ const CATEGORY_COLOR: Record<string, string> = {
   Música: "#1db954",
   Jogos: "#0ea5e9",
   Outros: "#64748b",
+};
+
+const CATEGORY_CLASSES: Record<string, { dot: string; progress: string }> = {
+  Streaming: {
+    dot: "bg-[#e50914]",
+    progress: "[&::-webkit-progress-value]:bg-[#e50914] [&::-moz-progress-bar]:bg-[#e50914]",
+  },
+  Trabalho: {
+    dot: "bg-[#6e5494]",
+    progress: "[&::-webkit-progress-value]:bg-[#6e5494] [&::-moz-progress-bar]:bg-[#6e5494]",
+  },
+  Fitness: {
+    dot: "bg-[#f59e0b]",
+    progress: "[&::-webkit-progress-value]:bg-[#f59e0b] [&::-moz-progress-bar]:bg-[#f59e0b]",
+  },
+  Música: {
+    dot: "bg-[#1db954]",
+    progress: "[&::-webkit-progress-value]:bg-[#1db954] [&::-moz-progress-bar]:bg-[#1db954]",
+  },
+  Jogos: {
+    dot: "bg-[#0ea5e9]",
+    progress: "[&::-webkit-progress-value]:bg-[#0ea5e9] [&::-moz-progress-bar]:bg-[#0ea5e9]",
+  },
+  Outros: {
+    dot: "bg-[#64748b]",
+    progress: "[&::-webkit-progress-value]:bg-[#64748b] [&::-moz-progress-bar]:bg-[#64748b]",
+  },
 };
 
 export default function Report({ subs, navigate }: Props) {
@@ -90,9 +118,9 @@ export default function Report({ subs, navigate }: Props) {
           </p>
           <div className="flex items-center gap-5">
             <svg width={size} height={size} className="shrink-0">
-              {arcs.map(({ cat, start, end }, i) => (
+              {arcs.map(({ cat, start, end }) => (
                 <path
-                  key={i}
+                  key={cat}
                   d={arcPath(cx, cy, r, start, end)}
                   fill="none"
                   stroke={CATEGORY_COLOR[cat] ?? "#64748b"}
@@ -124,7 +152,7 @@ export default function Report({ subs, navigate }: Props) {
                 <div key={cat}>
                   <div className="flex justify-between mb-1">
                     <div className="flex items-center gap-1.5">
-                      <div className="size-2 rounded-full shrink-0" style={{ background: CATEGORY_COLOR[cat] ?? "#64748b" }} />
+                      <div className={`size-2 rounded-full shrink-0 ${CATEGORY_CLASSES[cat]?.dot ?? CATEGORY_CLASSES.Outros.dot}`} />
                       <span className="text-xs font-body text-foreground">{cat}</span>
                     </div>
                     <span className="text-xs font-heading font-semibold text-foreground">
@@ -132,9 +160,10 @@ export default function Report({ subs, navigate }: Props) {
                     </span>
                   </div>
                   <div className="h-[3px] bg-border rounded-[4px]">
-                    <div
-                      className="h-full rounded-[4px] transition-[width] duration-[600ms] ease-in-out"
-                      style={{ background: CATEGORY_COLOR[cat] ?? "#64748b", width: `${(val / maxCat) * 100}%` }}
+                    <progress
+                      className={`block h-[3px] w-full appearance-none overflow-hidden rounded-[4px] bg-border [&::-webkit-progress-bar]:rounded-[4px] [&::-webkit-progress-bar]:bg-border [&::-webkit-progress-value]:rounded-[4px] [&::-moz-progress-bar]:rounded-[4px] transition-[width] duration-[600ms] ease-in-out ${CATEGORY_CLASSES[cat]?.progress ?? CATEGORY_CLASSES.Outros.progress}`}
+                      value={(val / maxCat) * 100}
+                      max={100}
                     />
                   </div>
                 </div>
@@ -160,21 +189,16 @@ export default function Report({ subs, navigate }: Props) {
                 }`}>
                   {i + 1}
                 </div>
-                <div
-                  className="w-10 h-10 rounded-sm flex items-center justify-center text-xl shrink-0"
-                  style={{ background: `${s.color}22` }}
-                >
+                <div className={`w-10 h-10 rounded-sm flex items-center justify-center text-xl shrink-0 ${getSubscriptionColorClasses(s.color).iconBackground}`}>
                   {s.icon}
                 </div>
                 <div className="flex-1">
                   <p className="font-heading font-semibold text-[15px] mb-[3px]">{s.name}</p>
                   <div className="h-1 bg-border rounded-[4px] overflow-hidden">
-                    <div
-                      className="h-full rounded-[4px]"
-                      style={{
-                        background: `linear-gradient(90deg, ${s.color}, ${s.color}88)`,
-                        width: `${(s.monthly / topSubs[0].monthly) * 100}%`,
-                      }}
+                    <progress
+                      className={`block h-1 w-full appearance-none overflow-hidden rounded-[4px] bg-border [&::-webkit-progress-bar]:rounded-[4px] [&::-webkit-progress-bar]:bg-border [&::-webkit-progress-value]:rounded-[4px] [&::-moz-progress-bar]:rounded-[4px] ${getSubscriptionColorClasses(s.color).progressGradient}`}
+                      value={s.monthly}
+                      max={topSubs[0].monthly}
                     />
                   </div>
                 </div>

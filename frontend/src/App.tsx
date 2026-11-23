@@ -1,4 +1,4 @@
-import { useState, ReactNode } from "react";
+import { useState, ReactNode, useEffect } from "react";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import Dashboard from "./screens/Dashboard";
 import AddSubscription from "./screens/AddSubscription";
@@ -12,7 +12,15 @@ import { Register } from './pages/Login/Cadastro';
 import { ForgotPassword } from './pages/Login/ForgotPassword';
 import EditSubscription from "./screens/EditSubscription";
 import { queryClient, subsQueryKey } from "./lib/queryClient";
-import { getSubsByUser } from "./lib/api";
+import {
+  clearSession,
+  getCurrentUser,
+  getStoredToken,
+  getStoredUser as readStoredUser,
+  getSubsByUser,
+  logoutUser,
+  saveSession,
+} from "./lib/api";
 
 export type Screen = "dashboard" | "add" | "edit" | "details" | "report" | "import" | "profile";
 
@@ -54,12 +62,7 @@ export interface CurrentUser {
 const SESSION_KEY = "subtracker_user";
 
 export function getStoredUser(): CurrentUser | null {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as CurrentUser) : null;
-  } catch {
-    return null;
-  }
+  return readStoredUser();
 }
 
 function saveStoredUser(user: CurrentUser) {
@@ -67,10 +70,110 @@ function saveStoredUser(user: CurrentUser) {
 }
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const user = localStorage.getItem(SESSION_KEY);
-  if (!user) {
+  const [isChecking, setIsChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function validateSession() {
+      const token = getStoredToken();
+      const storedUser = readStoredUser();
+
+      if (!token || !storedUser) {
+        clearSession();
+        if (!cancelled) {
+          setIsAuthenticated(false);
+          setIsChecking(false);
+        }
+        return;
+      }
+
+      try {
+        const currentUser = await getCurrentUser();
+        if (cancelled) return;
+
+        saveSession(token, currentUser);
+        setIsAuthenticated(true);
+      } catch {
+        if (!cancelled) {
+          clearSession();
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsChecking(false);
+        }
+      }
+    }
+
+    validateSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (isChecking) {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-foreground font-body">Validando sessão...</div>;
+  }
+
+  if (!isAuthenticated) {
     return <Navigate to="/" replace />;
   }
+
+  return <>{children}</>;
+}
+
+function PublicRoute({ children }: { children: ReactNode }) {
+  const [isChecking, setIsChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function validateSession() {
+      const token = getStoredToken();
+      if (!token) {
+        if (!cancelled) {
+          setIsAuthenticated(false);
+          setIsChecking(false);
+        }
+        return;
+      }
+
+      try {
+        const currentUser = await getCurrentUser();
+        if (cancelled) return;
+        saveSession(token, currentUser);
+        setIsAuthenticated(true);
+      } catch {
+        if (!cancelled) {
+          clearSession();
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsChecking(false);
+        }
+      }
+    }
+
+    validateSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (isChecking) {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-foreground font-body">Carregando...</div>;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/painel" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -79,9 +182,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/cadastro" element={<Register />} />
-          <Route path="/esqueci-senha" element={<ForgotPassword />} />
+          <Route path="/" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/cadastro" element={<PublicRoute><Register /></PublicRoute>} />
+          <Route path="/esqueci-senha" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
           <Route
             path="/painel"
             element={
@@ -102,13 +205,31 @@ function Painel() {
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const [user, setUser] = useState<CurrentUser | null>(() => getStoredUser());
 
+  useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+        setUser(currentUser);
+        return currentUser;
+      } catch {
+        clearSession();
+        setUser(null);
+        routerNavigate("/");
+        return null;
+      }
+    },
+    enabled: !!getStoredToken(),
+  });
+
   // TanStack Query cuida do fetch, do cache e do estado de carregamento das
   // assinaturas — cada tela que precisa alterar dados invalida esta mesma
   // chave (subsQueryKey) depois de uma mutação, em vez de recebermos um
   // `setSubs` para atualizar manualmente.
-  const { data: subs = [] } = useQuery({
+  const { data: subs = [], isPending, isError, error } = useQuery({
     queryKey: subsQueryKey(user?.id),
-    queryFn: () => getSubsByUser(user!.id),
+    queryFn: () => getSubsByUser(),
     enabled: !!user,
   });
 
@@ -118,7 +239,11 @@ function Painel() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem(SESSION_KEY);
+    void logoutUser().catch((error: unknown) => {
+      console.error("Não foi possível revogar a sessão no servidor.", error);
+    });
+    clearSession();
+    queryClient.clear();
     setUser(null);
     routerNavigate('/');
   };
@@ -135,18 +260,18 @@ function Painel() {
   if (!user) return null;
 
   return (
-    <div className="flex flex-col md:flex-row w-screen min-h-screen bg-background">
+    <div className="flex flex-col md:flex-row w-full min-h-screen bg-background">
 
       {/* Sidebar — só aparece a partir do breakpoint md (768px), via CSS puro */}
       <aside className="hidden md:flex w-[260px] bg-[rgba(8,14,29,0.95)] border-r border-[rgba(255,255,255,0.06)] flex-col py-6 px-4 justify-between h-screen sticky top-0">
         <div>
-          <div className="text-xl font-bold text-white mb-8 pl-3 font-heading">
+          <header className="text-xl font-bold text-white mb-8 pl-3 font-heading">
             Sub<span className="text-primary">Tracker</span>
-          </div>
+          </header>
           <DesktopNav screen={screen} navigate={navigate} />
         </div>
 
-        <div className="p-3 border-t border-[rgba(255,255,255,0.06)]">
+        <footer className="p-3 border-t border-[rgba(255,255,255,0.06)]">
           <p className="text-[13px] text-foreground font-semibold mb-2 overflow-hidden text-ellipsis whitespace-nowrap font-body">
             {user.nome}
           </p>
@@ -156,13 +281,23 @@ function Painel() {
           >
             Terminar Sessão
           </button>
-        </div>
+        </footer>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-y-auto min-h-screen pb-20 md:pb-0">
         <div className="w-full max-w-full md:max-w-[1200px] mx-auto p-4 md:p-10">
           {screen === "dashboard" && (
-            <Dashboard subs={subs} navigate={navigate} budgets={user.budgets ?? DEFAULT_BUDGETS} userName={user.nome} />
+            isPending ? (
+              <p>Carregando assinaturas...</p>
+            ) : isError ? (
+              <p role="alert">
+                {error instanceof Error
+                  ? "Não foi possível carregar suas assinaturas."
+                  : "Ocorreu um erro ao carregar suas assinaturas."}
+              </p>
+            ) : (
+              <Dashboard subs={subs} navigate={navigate} budgets={user.budgets ?? DEFAULT_BUDGETS} userName={user.nome} />
+            )
           )}
           {screen === "add" && (
             <AddSubscription navigate={navigate} />
@@ -222,47 +357,49 @@ function DesktopNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen
 
 function BottomNav({ screen, navigate }: { screen: Screen; navigate: (s: Screen) => void }) {
   return (
-    <div className="flex md:hidden fixed bottom-0 left-0 right-0 bg-[rgba(8,14,29,0.95)] backdrop-blur-[16px] border-t border-border justify-around items-center pt-3 px-4 pb-5 z-50">
-      {[
-        { key: "dashboard", icon: "⊞", label: "Início" },
-        { key: "add", icon: "+", label: "Adicionar" },
-        { key: "report", icon: "◎", label: "Relatório" },
-      ].map((item) => {
-        const active =
-          screen === item.key ||
-          (screen === "details" && item.key === "dashboard") ||
-          (screen === "edit" && item.key === "dashboard") ||
-          (screen === "import" && item.key === "dashboard") ||
-          (screen === "profile" && item.key === "dashboard");
+    <footer className="flex md:hidden fixed bottom-0 left-0 right-0 bg-[rgba(8,14,29,0.95)] backdrop-blur-[16px] border-t border-border pt-3 px-4 pb-5 z-50">
+      <nav aria-label="Navegação inferior" className="flex w-full justify-around items-center">
+        {[
+          { key: "dashboard", icon: "⊞", label: "Início" },
+          { key: "add", icon: "+", label: "Adicionar" },
+          { key: "report", icon: "◎", label: "Relatório" },
+        ].map((item) => {
+          const active =
+            screen === item.key ||
+            (screen === "details" && item.key === "dashboard") ||
+            (screen === "edit" && item.key === "dashboard") ||
+            (screen === "import" && item.key === "dashboard") ||
+            (screen === "profile" && item.key === "dashboard");
 
-        if (item.key === "add") {
+          if (item.key === "add") {
+            return (
+              <button
+                key={item.key}
+                onClick={() => navigate(item.key as Screen)}
+                className="flex items-center gap-1.5 bg-primary text-primary-foreground border-none rounded-xl py-2.5 px-5 cursor-pointer shadow-[0_4px_12px_rgba(0,212,170,0.3)]"
+              >
+                <span className="text-xl font-bold">{item.icon}</span>
+                <span className="text-sm font-bold font-body">{item.label}</span>
+              </button>
+            );
+          }
+
           return (
             <button
               key={item.key}
               onClick={() => navigate(item.key as Screen)}
-              className="flex items-center gap-1.5 bg-primary text-primary-foreground border-none rounded-xl py-2.5 px-5 cursor-pointer shadow-[0_4px_12px_rgba(0,212,170,0.3)]"
+              className={`flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-3 transition-colors ${
+                active ? "text-primary" : "text-muted-foreground"
+              }`}
             >
-              <span className="text-xl font-bold">{item.icon}</span>
-              <span className="text-sm font-bold font-body">{item.label}</span>
+              <span className="text-xl leading-none">{item.icon}</span>
+              <span className={`text-[11px] font-body ${active ? "font-semibold" : "font-normal"}`}>
+                {item.label}
+              </span>
             </button>
           );
-        }
-
-        return (
-          <button
-            key={item.key}
-            onClick={() => navigate(item.key as Screen)}
-            className={`flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-3 transition-colors ${
-              active ? "text-primary" : "text-muted-foreground"
-            }`}
-          >
-            <span className="text-xl leading-none">{item.icon}</span>
-            <span className={`text-[11px] font-body ${active ? "font-semibold" : "font-normal"}`}>
-              {item.label}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+        })}
+      </nav>
+    </footer>
   );
 }

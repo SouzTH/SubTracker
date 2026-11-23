@@ -34,6 +34,50 @@ const KNOWN_SERVICES = [
   { keyword: "CANVA", name: "Canva Pro", icon: "🖌️", color: "#8b5cf6", category: "Trabalho" as const },
 ];
 
+const SERVICE_COLOR_CLASSES: Record<string, {
+  selectedCard: string;
+  checkedBox: string;
+  iconBackground: string;
+  selectedText: string;
+}> = {
+  "#e50914": {
+    selectedCard: "bg-[#e50914]/[0.06] border-[#e50914]/[0.33]",
+    checkedBox: "border-[#e50914] bg-[#e50914]",
+    iconBackground: "bg-[#e50914]/[0.13]",
+    selectedText: "text-[#e50914]",
+  },
+  "#1db954": {
+    selectedCard: "bg-[#1db954]/[0.06] border-[#1db954]/[0.33]",
+    checkedBox: "border-[#1db954] bg-[#1db954]",
+    iconBackground: "bg-[#1db954]/[0.13]",
+    selectedText: "text-[#1db954]",
+  },
+  "#f59e0b": {
+    selectedCard: "bg-[#f59e0b]/[0.06] border-[#f59e0b]/[0.33]",
+    checkedBox: "border-[#f59e0b] bg-[#f59e0b]",
+    iconBackground: "bg-[#f59e0b]/[0.13]",
+    selectedText: "text-[#f59e0b]",
+  },
+  "#ff0000": {
+    selectedCard: "bg-[#ff0000]/[0.06] border-[#ff0000]/[0.33]",
+    checkedBox: "border-[#ff0000] bg-[#ff0000]",
+    iconBackground: "bg-[#ff0000]/[0.13]",
+    selectedText: "text-[#ff0000]",
+  },
+  "#6e5494": {
+    selectedCard: "bg-[#6e5494]/[0.06] border-[#6e5494]/[0.33]",
+    checkedBox: "border-[#6e5494] bg-[#6e5494]",
+    iconBackground: "bg-[#6e5494]/[0.13]",
+    selectedText: "text-[#6e5494]",
+  },
+  "#8b5cf6": {
+    selectedCard: "bg-[#8b5cf6]/[0.06] border-[#8b5cf6]/[0.33]",
+    checkedBox: "border-[#8b5cf6] bg-[#8b5cf6]",
+    iconBackground: "bg-[#8b5cf6]/[0.13]",
+    selectedText: "text-[#8b5cf6]",
+  },
+};
+
 // Converte "dd/mm/yyyy" (formato do nosso CSV) para "yyyy-mm-dd" (formato usado no resto do app)
 function toISO(dateBR: string): string {
   const [d, m, y] = dateBR.split("/");
@@ -144,7 +188,6 @@ export default function ImportStatement({ navigate, subs }: Props) {
         } else {
           // Novo: cria a assinatura com as datas reais detectadas no extrato.
           await createSub({
-            userId: user.id,
             name: d.name,
             icon: d.icon,
             color: d.color,
@@ -179,7 +222,7 @@ export default function ImportStatement({ navigate, subs }: Props) {
   const error = saveMutation.isError
     ? saveMutation.error instanceof ApiError
       ? saveMutation.error.message
-      : "Não foi possível salvar no servidor. Verifique se o json-server está rodando (npm run server) e tente novamente."
+      : "Não foi possível salvar no servidor. Verifique se a API está em execução e tente novamente."
     : null;
 
   const canSubmit = confirmed.size > 0 && !saved && !saving;
@@ -213,31 +256,34 @@ export default function ImportStatement({ navigate, subs }: Props) {
 
       <div className="px-6">
         {stage === "upload" && (
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragging(false);
-              const f = e.dataTransfer.files[0];
-              if (f) handleFile(f);
-            }}
-            onClick={() => fileRef.current?.click()}
-            className={`border-2 border-dashed rounded-lg py-12 px-6 flex flex-col items-center gap-3 cursor-pointer transition-colors duration-200 mb-5 ${
-              dragging ? "border-primary bg-primary/5" : "border-primary/25 bg-card"
-            }`}
-          >
-            <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center text-[32px]">
-              📄
-            </div>
-            <div className="text-center">
-              <p className="font-heading font-semibold text-base mb-1.5">
-                Arraste seu arquivo aqui
-              </p>
-              <p className="text-[13px] text-muted-foreground font-body">
-                ou clique para selecionar o arquivo .csv
-              </p>
-            </div>
+          <>
+            <button
+              type="button"
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const f = e.dataTransfer.files[0];
+                if (f) handleFile(f);
+              }}
+              onClick={() => fileRef.current?.click()}
+              className={`w-full text-center border-2 border-dashed rounded-lg py-12 px-6 flex flex-col items-center gap-3 cursor-pointer transition-colors duration-200 mb-5 ${
+                dragging ? "border-primary bg-primary/5" : "border-primary/25 bg-card"
+              }`}
+            >
+              <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center text-[32px]">
+                📄
+              </div>
+              <div className="text-center">
+                <p className="font-heading font-semibold text-base mb-1.5">
+                  Arraste seu arquivo aqui
+                </p>
+                <p className="text-[13px] text-muted-foreground font-body">
+                  ou clique para selecionar o arquivo .csv
+                </p>
+              </div>
+            </button>
             <input
               ref={fileRef}
               type="file"
@@ -248,7 +294,7 @@ export default function ImportStatement({ navigate, subs }: Props) {
                 if (f) handleFile(f);
               }}
             />
-          </div>
+          </>
         )}
 
         {stage === "review" && (
@@ -270,19 +316,24 @@ export default function ImportStatement({ navigate, subs }: Props) {
             <div className="flex flex-col gap-2.5 mb-6">
               {detected.map((d) => {
                 const isChecked = confirmed.has(d.id);
+                const colorClasses = SERVICE_COLOR_CLASSES[d.color] ?? {
+                  selectedCard: "bg-primary/5 border-primary/30",
+                  checkedBox: "border-primary bg-primary",
+                  iconBackground: "bg-primary/10",
+                  selectedText: "text-primary",
+                };
                 return (
                   <button
                     key={d.id}
                     onClick={() => toggle(d.id)}
-                    className="rounded-md py-4 px-4 flex items-center gap-[14px] cursor-pointer text-left w-full transition-colors duration-[180ms] border-[1.5px]"
-                    style={{
-                      background: isChecked ? `${d.color}0f` : "var(--card)",
-                      borderColor: isChecked ? `${d.color}55` : "var(--border)",
-                    }}
+                    className={`rounded-md py-4 px-4 flex items-center gap-[14px] cursor-pointer text-left w-full transition-colors duration-[180ms] border-[1.5px] ${
+                      isChecked ? colorClasses.selectedCard : "bg-card border-border"
+                    }`}
                   >
                     <div
-                      className="w-[22px] h-[22px] rounded-[8px] border-2 flex items-center justify-center shrink-0 transition-colors duration-150"
-                      style={{ borderColor: isChecked ? d.color : "var(--border)", background: isChecked ? d.color : "transparent" }}
+                      className={`w-[22px] h-[22px] rounded-[8px] border-2 flex items-center justify-center shrink-0 transition-colors duration-150 ${
+                        isChecked ? colorClasses.checkedBox : "border-border bg-transparent"
+                      }`}
                     >
                       {isChecked && (
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -291,10 +342,7 @@ export default function ImportStatement({ navigate, subs }: Props) {
                       )}
                     </div>
 
-                    <div
-                      className="w-[42px] h-[42px] rounded-sm flex items-center justify-center text-xl shrink-0"
-                      style={{ background: `${d.color}22` }}
-                    >
+                    <div className={`w-[42px] h-[42px] rounded-sm flex items-center justify-center text-xl shrink-0 ${colorClasses.iconBackground}`}>
                       {d.icon}
                     </div>
 
@@ -313,7 +361,7 @@ export default function ImportStatement({ navigate, subs }: Props) {
                     </div>
 
                     <div className="text-right shrink-0">
-                      <p className="font-heading font-bold text-base" style={{ color: isChecked ? d.color : "var(--foreground)" }}>
+                      <p className={`font-heading font-bold text-base ${isChecked ? colorClasses.selectedText : "text-foreground"}`}>
                         {fmt(d.value)}
                       </p>
                       <p className="text-[11px] text-muted-foreground font-body">
