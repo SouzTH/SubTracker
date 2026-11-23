@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { CreateSubscriptionInput, UpdateSubscriptionInput } from "@subtracker/shared";
+import { AppError } from "../../utils/AppError";
 import type { Subscription, SubscriptionRepository } from "../types";
 import { toSubscription, WITH_HISTORY } from "./mappers";
 
@@ -15,15 +16,18 @@ export class PrismaSubscriptionRepository implements SubscriptionRepository {
     return rows.map(toSubscription);
   }
 
-  // Todo acesso por id filtra TAMBÉM por userId: é isso que impede um
-  // usuário de ler ou alterar a assinatura de outro só adivinhando o id
-  // (o json-server não tinha essa proteção).
   async findOwned(userId: string, id: string): Promise<Subscription | null> {
-    const row = await this.db.subscription.findFirst({
-      where: { id, userId },
+    const row = await this.db.subscription.findUnique({
+      where: { id },
       include: WITH_HISTORY,
     });
-    return row ? toSubscription(row) : null;
+    if (!row) {
+      return null;
+    }
+    if (row.userId !== userId) {
+      throw new AppError("Você não tem permissão para acessar esta assinatura.", 403);
+    }
+    return toSubscription(row);
   }
 
   async create(userId: string, data: CreateSubscriptionInput): Promise<Subscription> {
@@ -39,16 +43,19 @@ export class PrismaSubscriptionRepository implements SubscriptionRepository {
     id: string,
     patch: UpdateSubscriptionInput,
   ): Promise<Subscription | null> {
-    const owned = await this.db.subscription.findFirst({
-      where: { id, userId },
-      select: { id: true },
+    const row = await this.db.subscription.findUnique({
+      where: { id },
+      select: { id: true, userId: true },
     });
-    if (!owned) {
+    if (!row) {
       return null;
+    }
+    if (row.userId !== userId) {
+      throw new AppError("Você não tem permissão para editar esta assinatura.", 403);
     }
 
     const { history, ...fields } = patch;
-    const row = await this.db.subscription.update({
+    const updated = await this.db.subscription.update({
       where: { id },
       data: {
         ...fields,
@@ -58,13 +65,22 @@ export class PrismaSubscriptionRepository implements SubscriptionRepository {
       },
       include: WITH_HISTORY,
     });
-    return toSubscription(row);
+    return toSubscription(updated);
   }
 
   async remove(userId: string, id: string): Promise<boolean> {
-    // deleteMany aceita filtro composto (id + userId); o histórico some
-    // junto por causa do onDelete: Cascade do schema.
-    const { count } = await this.db.subscription.deleteMany({ where: { id, userId } });
+    const row = await this.db.subscription.findUnique({
+      where: { id },
+      select: { id: true, userId: true },
+    });
+    if (!row) {
+      return false;
+    }
+    if (row.userId !== userId) {
+      throw new AppError("Você não tem permissão para excluir esta assinatura.", 403);
+    }
+
+    const { count } = await this.db.subscription.deleteMany({ where: { id } });
     return count > 0;
   }
 }

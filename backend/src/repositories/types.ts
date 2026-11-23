@@ -81,11 +81,12 @@ export interface PasswordResetRepository {
 // responsabilidade da camada de dados, não de quem chama.
 export interface SubscriptionRepository {
   listByUser(userId: string): Promise<Subscription[]>;
+  /** Devolve null se não existir; lança AppError 403 se pertencer a outro usuário. */
   findOwned(userId: string, id: string): Promise<Subscription | null>;
   create(userId: string, data: CreateSubscriptionInput): Promise<Subscription>;
-  /** Devolve null se a assinatura não existir ou não for do usuário. */
+  /** Devolve null se não existir; lança AppError 403 se pertencer a outro usuário. */
   update(userId: string, id: string, patch: UpdateSubscriptionInput): Promise<Subscription | null>;
-  /** Devolve false se a assinatura não existir ou não for do usuário. */
+  /** Devolve false se não existir; lança AppError 403 se pertencer a outro usuário. */
   remove(userId: string, id: string): Promise<boolean>;
 }
 
