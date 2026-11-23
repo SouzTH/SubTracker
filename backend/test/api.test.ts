@@ -126,7 +126,51 @@ test("API rotates refresh cookies, protects routes, and isolates subscription ow
   const otherUserRead = await fetch(`${baseUrl}/api/subscriptions/${subscription.id}`, {
     headers: { Authorization: `Bearer ${secondBody.accessToken}` },
   });
-  assert.equal(otherUserRead.status, 404);
+  assert.equal(otherUserRead.status, 403);
+
+  const otherUserUpdate = await fetch(`${baseUrl}/api/subscriptions/${subscription.id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${secondBody.accessToken}`,
+    },
+    body: JSON.stringify({ name: "Tentativa não autorizada" }),
+  });
+  assert.equal(otherUserUpdate.status, 403);
+
+  const otherUserDelete = await fetch(`${baseUrl}/api/subscriptions/${subscription.id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${secondBody.accessToken}` },
+  });
+  assert.equal(otherUserDelete.status, 403);
+
+  const missingSubscriptionId = `missing-${randomUUID()}`;
+  const missingRead = await fetch(`${baseUrl}/api/subscriptions/${missingSubscriptionId}`, {
+    headers: { Authorization: `Bearer ${secondBody.accessToken}` },
+  });
+  assert.equal(missingRead.status, 404);
+
+  const missingUpdate = await fetch(`${baseUrl}/api/subscriptions/${missingSubscriptionId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${secondBody.accessToken}`,
+    },
+    body: JSON.stringify({ name: "Assinatura inexistente" }),
+  });
+  assert.equal(missingUpdate.status, 404);
+
+  const missingDelete = await fetch(`${baseUrl}/api/subscriptions/${missingSubscriptionId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${secondBody.accessToken}` },
+  });
+  assert.equal(missingDelete.status, 404);
+
+  const secondUserSubscriptions = await fetch(`${baseUrl}/api/subscriptions`, {
+    headers: { Authorization: `Bearer ${secondBody.accessToken}` },
+  });
+  assert.equal(secondUserSubscriptions.status, 200);
+  assert.deepEqual(await secondUserSubscriptions.json(), []);
 
   const refreshResponse = await post("/api/auth/refresh", undefined, firstCookie);
   assert.equal(refreshResponse.status, 200);
