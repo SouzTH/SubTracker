@@ -111,13 +111,15 @@ export default function Dashboard({ subs, navigate, budgets, userName }: Props) 
               <span className="text-sm">⬆</span>
               Importar Extrato
             </button>
-            <div
+            <button
+              type="button"
               onClick={() => navigate("profile")}
+              aria-label="Meu perfil"
               title="Meu perfil"
-              className="size-10 rounded-full bg-[linear-gradient(135deg,var(--primary),#0099aa)] flex items-center justify-center text-lg shrink-0 cursor-pointer"
+              className="size-10 rounded-full bg-[linear-gradient(135deg,var(--primary),#0099aa)] flex items-center justify-center text-lg shrink-0 cursor-pointer border-none p-0"
             >
               👤
-            </div>
+            </button>
           </div>
         </div>
       </div>

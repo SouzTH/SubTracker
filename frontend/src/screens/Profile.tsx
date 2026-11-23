@@ -88,12 +88,13 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
             noValidate
             className="flex flex-col gap-[14px]"
           >
-            <Field label="Nome" error={infoForm.formState.errors.nome?.message}>
-              <input type="text" className={`${baseInputClass} px-[14px]`} {...infoForm.register("nome")} />
+            <Field id="profile-name" label="Nome" error={infoForm.formState.errors.nome?.message}>
+              <input id="profile-name" type="text" className={`${baseInputClass} px-[14px]`} {...infoForm.register("nome")} />
             </Field>
 
-            <Field label="Email">
+            <Field id="profile-email" label="Email">
               <input
+                id="profile-email"
                 type="email"
                 value={user.email}
                 disabled
@@ -102,8 +103,9 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
               />
             </Field>
 
-            <Field label="Telefone (opcional)">
+            <Field id="profile-phone" label="Telefone (opcional)">
               <input
+                id="profile-phone"
                 type="tel"
                 placeholder="(00) 00000-0000"
                 className={`${baseInputClass} px-[14px]`}
@@ -111,8 +113,9 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
               />
             </Field>
 
-            <Field label="Forma de pagamento padrão" error={infoForm.formState.errors.paymentMethod?.message}>
+            <Field id="profile-payment-method" label="Forma de pagamento padrão" error={infoForm.formState.errors.paymentMethod?.message}>
               <select
+                id="profile-payment-method"
                 className={`${baseInputClass} px-[14px] appearance-none cursor-pointer [color-scheme:dark]`}
                 {...infoForm.register("paymentMethod")}
               >
@@ -152,12 +155,13 @@ export default function Profile({ user, onUserUpdate, onLogout, navigate }: Prop
             className="flex flex-col gap-3"
           >
             {CATEGORIES.map((cat) => (
-              <Field key={cat} label={cat} error={budgetsForm.formState.errors[cat]?.message}>
+              <Field key={cat} id={`budget-${cat}`} label={cat} error={budgetsForm.formState.errors[cat]?.message}>
                 <div className="relative">
                   <span className="absolute left-[14px] top-1/2 -translate-y-1/2 font-heading font-semibold text-sm text-primary">
                     R$
                   </span>
                   <input
+                    id={`budget-${cat}`}
                     type="number"
                     min={0}
                     step="0.01"
