@@ -25,6 +25,7 @@ function formatDate(iso: string) {
 export default function SubscriptionDetails({ sub, navigate }: Props) {
   const queryClient = useQueryClient();
   const user = getStoredUser();
+  const historyKeyOccurrences = new Map<string, number>();
   const invalidate = () => queryClient.invalidateQueries({ queryKey: subsQueryKey(user?.id) });
 
   const pauseMutation = useMutation({
@@ -152,35 +153,40 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {sub.history.map((h, i) => (
-                <div key={i} className="bg-card rounded-[14px] py-[14px] px-4 flex items-center justify-between border border-border">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center text-base ${
-                      h.status === "Pago" ? "bg-primary/12" : "bg-amber-500/12"
-                    }`}>
-                      {h.status === "Pago" ? "✓" : "⏳"}
+              {sub.history.map((h) => {
+                const historyKey = `${h.date}-${h.status}-${h.value}`;
+                const occurrence = historyKeyOccurrences.get(historyKey) ?? 0;
+                historyKeyOccurrences.set(historyKey, occurrence + 1);
+                return (
+                  <div key={`${historyKey}-${occurrence}`} className="bg-card rounded-[14px] py-[14px] px-4 flex items-center justify-between border border-border">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center text-base ${
+                        h.status === "Pago" ? "bg-primary/12" : "bg-amber-500/12"
+                      }`}>
+                        {h.status === "Pago" ? "✓" : "⏳"}
+                      </div>
+                      <div>
+                        <p className="font-heading font-semibold text-sm mb-0.5">
+                          {new Date(h.date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-body">
+                          {new Date(h.date + "T00:00:00").getFullYear()}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-heading font-semibold text-sm mb-0.5">
-                        {new Date(h.date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}
+                    <div className="text-right">
+                      <p className="font-heading font-bold text-[15px] mb-1">
+                        {fmt(h.value)}
                       </p>
-                      <p className="text-xs text-muted-foreground font-body">
-                        {new Date(h.date + "T00:00:00").getFullYear()}
-                      </p>
+                      <span className={`text-[11px] py-0.5 px-2 rounded-[10px] font-body ${
+                        h.status === "Pago" ? "bg-primary/15 text-primary" : "bg-amber-500/15 text-amber-500"
+                      }`}>
+                        {h.status}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-heading font-bold text-[15px] mb-1">
-                      {fmt(h.value)}
-                    </p>
-                    <span className={`text-[11px] py-0.5 px-2 rounded-[10px] font-body ${
-                      h.status === "Pago" ? "bg-primary/15 text-primary" : "bg-amber-500/15 text-amber-500"
-                    }`}>
-                      {h.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

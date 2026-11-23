@@ -25,14 +25,47 @@ const daysUntil = (dateString: string) => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-const CATEGORY_COLOR: Record<string, string> = {
-  Streaming: "#e50914",
-  Trabalho: "#6e5494",
-  Fitness: "#f59e0b",
-  Música: "#1db954",
-  Jogos: "#0ea5e9",
-  Outros: "#64748b",
+const CATEGORY_CLASSES: Record<string, { dot: string; progressFill: string }> = {
+  Streaming: {
+    dot: "bg-[#e50914]",
+    progressFill: "[&::-webkit-progress-value]:bg-[#e50914] [&::-moz-progress-bar]:bg-[#e50914]",
+  },
+  Trabalho: {
+    dot: "bg-[#6e5494]",
+    progressFill: "[&::-webkit-progress-value]:bg-[#6e5494] [&::-moz-progress-bar]:bg-[#6e5494]",
+  },
+  Fitness: {
+    dot: "bg-[#f59e0b]",
+    progressFill: "[&::-webkit-progress-value]:bg-[#f59e0b] [&::-moz-progress-bar]:bg-[#f59e0b]",
+  },
+  Música: {
+    dot: "bg-[#1db954]",
+    progressFill: "[&::-webkit-progress-value]:bg-[#1db954] [&::-moz-progress-bar]:bg-[#1db954]",
+  },
+  Jogos: {
+    dot: "bg-[#0ea5e9]",
+    progressFill: "[&::-webkit-progress-value]:bg-[#0ea5e9] [&::-moz-progress-bar]:bg-[#0ea5e9]",
+  },
+  Outros: {
+    dot: "bg-[#64748b]",
+    progressFill: "[&::-webkit-progress-value]:bg-[#64748b] [&::-moz-progress-bar]:bg-[#64748b]",
+  },
 }
+
+const SUBSCRIPTION_ICON_CLASSES: Record<string, string> = {
+  "#e50914": "bg-[#e50914]/[0.13] border-[#e50914]/[0.27]",
+  "#1db954": "bg-[#1db954]/[0.13] border-[#1db954]/[0.27]",
+  "#0063e5": "bg-[#0063e5]/[0.13] border-[#0063e5]/[0.27]",
+  "#5822a4": "bg-[#5822a4]/[0.13] border-[#5822a4]/[0.27]",
+  "#ff0000": "bg-[#ff0000]/[0.13] border-[#ff0000]/[0.27]",
+  "#6e5494": "bg-[#6e5494]/[0.13] border-[#6e5494]/[0.27]",
+  "#f59e0b": "bg-[#f59e0b]/[0.13] border-[#f59e0b]/[0.27]",
+  "#003087": "bg-[#003087]/[0.13] border-[#003087]/[0.27]",
+  "#64748b": "bg-[#64748b]/[0.13] border-[#64748b]/[0.27]",
+};
+
+const OVER_BUDGET_PROGRESS_FILL =
+  "[&::-webkit-progress-value]:bg-red-500 [&::-moz-progress-bar]:bg-red-500";
 
 export default function Dashboard({ subs, navigate, budgets, userName }: Props) {
 
@@ -62,9 +95,9 @@ export default function Dashboard({ subs, navigate, budgets, userName }: Props) 
       <div className="pt-14 px-6">
         <div className="flex justify-between items-center mb-2">
           <div>
-            <p className="text-lg text-muted-foreground font-body mb-0.5 font-bold">
+            <h1 className="text-lg text-muted-foreground font-body mb-0.5 font-bold">
               Olá, {userName}!
-            </p>
+            </h1>
             <p className="text-[13px] text-muted-foreground font-body">
               {formattedDateString}
             </p>
@@ -123,7 +156,9 @@ export default function Dashboard({ subs, navigate, budgets, userName }: Props) 
             const limit = budgets[cat] ?? 100
             const pct = Math.min((spent / limit) * 100, 100)
             const over = spent > limit
-            const color = CATEGORY_COLOR[cat] ?? "#64748b"
+            const progressFill = over
+              ? OVER_BUDGET_PROGRESS_FILL
+              : CATEGORY_CLASSES[cat]?.progressFill ?? CATEGORY_CLASSES.Outros.progressFill;
             return (
               <div
                 key={cat}
@@ -131,7 +166,7 @@ export default function Dashboard({ subs, navigate, budgets, userName }: Props) 
               >
                 <div className="flex justify-between items-center mb-2">
                   <div className="flex items-center gap-[7px]">
-                    <div className="size-2 rounded-full shrink-0" style={{ background: color }} />
+                    <div className={`size-2 rounded-full shrink-0 ${CATEGORY_CLASSES[cat]?.dot ?? CATEGORY_CLASSES.Outros.dot}`} />
                     <span className="text-[13px] font-body text-foreground font-medium">
                       {cat}
                     </span>
@@ -149,14 +184,10 @@ export default function Dashboard({ subs, navigate, budgets, userName }: Props) 
                   </span>
                 </div>
                 <div className="h-[5px] bg-border rounded-[4px] overflow-hidden">
-                  <div
-                    className="h-full rounded-[4px] transition-[width] duration-[600ms] ease-in-out"
-                    style={{
-                      width: `${pct}%`,
-                      background: over
-                        ? "linear-gradient(90deg, #ef4444, #f87171)"
-                        : `linear-gradient(90deg, ${color}, ${color}aa)`,
-                    }}
+                  <progress
+                    className={`block h-[5px] w-full appearance-none overflow-hidden rounded-[4px] bg-border [&::-webkit-progress-bar]:rounded-[4px] [&::-webkit-progress-bar]:bg-border [&::-webkit-progress-value]:rounded-[4px] [&::-moz-progress-bar]:rounded-[4px] ${progressFill}`}
+                    value={pct}
+                    max={100}
                   />
                 </div>
               </div>
@@ -178,6 +209,8 @@ export default function Dashboard({ subs, navigate, budgets, userName }: Props) 
           ) : sorted.map((sub) => {
             const days = daysUntil(sub.nextCharge)
             const urgent = days <= 3
+            const iconClasses =
+              SUBSCRIPTION_ICON_CLASSES[sub.color] ?? "bg-slate-500/10 border-slate-500/20";
             return (
               <button
                 key={sub.id}
@@ -186,10 +219,7 @@ export default function Dashboard({ subs, navigate, budgets, userName }: Props) 
                   urgent && sub.status === "Ativa" ? "border-amber-500/30" : "border-border"
                 }`}
               >
-                <div
-                  className="size-12 rounded-[14px] flex items-center justify-center text-[22px] shrink-0 border"
-                  style={{ background: `${sub.color}22`, borderColor: `${sub.color}33` }}
-                >
+                <div className={`size-12 rounded-[14px] flex items-center justify-center text-[22px] shrink-0 border ${iconClasses}`}>
                   {sub.icon}
                 </div>
                 <div className="flex-1 min-w-0">

@@ -90,9 +90,9 @@ export default function Report({ subs, navigate }: Props) {
           </p>
           <div className="flex items-center gap-5">
             <svg width={size} height={size} className="shrink-0">
-              {arcs.map(({ cat, start, end }, i) => (
+              {arcs.map(({ cat, start, end }) => (
                 <path
-                  key={i}
+                  key={cat}
                   d={arcPath(cx, cy, r, start, end)}
                   fill="none"
                   stroke={CATEGORY_COLOR[cat] ?? "#64748b"}
