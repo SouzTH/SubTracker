@@ -4,7 +4,10 @@ import { AppError } from "../utils/AppError";
 
 let transporter: Transporter | undefined;
 
-export function getPasswordResetTransport(): Transporter {
+export function getPasswordResetTransport(): Transporter | undefined {
+  if (!env.smtpHost && !env.isProduction) {
+    return undefined;
+  }
   if (!env.smtpHost || !env.passwordResetEmailFrom) {
     throw new AppError("O serviço de recuperação de senha não está configurado.", 503);
   }
@@ -28,6 +31,10 @@ export function getPasswordResetTransport(): Transporter {
 
 export async function sendPasswordResetEmail(email: string, resetUrl: string): Promise<void> {
   const mailer = getPasswordResetTransport();
+  if (!mailer) {
+    console.info("E-mail de redefinição não enviado: SMTP_HOST não está configurado (ambiente de desenvolvimento).");
+    return;
+  }
   const from = env.passwordResetEmailFrom;
   if (!from) {
     throw new AppError("O serviço de recuperação de senha não está configurado.", 503);
