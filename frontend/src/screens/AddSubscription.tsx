@@ -9,6 +9,7 @@ import { subsQueryKey } from "../lib/queryClient";
 import { SERVICES, ServiceCatalogEntry } from "../constants/catalog";
 import { PAYMENTS } from "../constants/payments";
 import { Field } from "../components/Field";
+import { getSubscriptionColorClasses } from "../lib/subscriptionColorClasses";
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -115,10 +116,7 @@ export default function AddSubscription({ navigate }: Props) {
                 onClick={() => handleSelectService(s)}
                 className="bg-card border border-border rounded-md py-5 px-2 flex flex-col items-center gap-2 cursor-pointer transition-colors duration-150"
               >
-                <div
-                  className="w-11 h-11 rounded-sm flex items-center justify-center text-[22px]"
-                  style={{ background: `${s.color}22` }}
-                >
+                <div className={`w-11 h-11 rounded-sm flex items-center justify-center text-[22px] ${getSubscriptionColorClasses(s.color).iconBackground}`}>
                   {s.icon}
                 </div>
                 <span className="text-[11px] font-body text-foreground text-center">{s.name}</span>
@@ -132,10 +130,7 @@ export default function AddSubscription({ navigate }: Props) {
         <form className="px-6" onSubmit={handleSubmit(onSubmit)} noValidate>
           {/* Selected service preview */}
           <div className="flex items-center gap-[14px] bg-card rounded-md py-4 px-4 mb-6 border border-border">
-            <div
-              className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center text-[26px]"
-              style={{ background: `${selected.color}22` }}
-            >
+            <div className={`w-[52px] h-[52px] rounded-[14px] flex items-center justify-center text-[26px] ${getSubscriptionColorClasses(selected.color).iconBackground}`}>
               {selected.icon}
             </div>
             <div>
@@ -146,13 +141,14 @@ export default function AddSubscription({ navigate }: Props) {
 
           <div className="flex flex-col gap-[18px]">
             {/* Value */}
-            <Field label="Valor da assinatura" error={errors.value?.message}>
+            <Field id="subscription-value" label="Valor da assinatura" error={errors.value?.message}>
               <div className="relative">
                 <span className="absolute left-[14px] top-1/2 -translate-y-1/2 font-heading font-semibold text-base text-primary">
                   R$
                 </span>
                 <input
                   type="number"
+                  id="subscription-value"
                   step="0.01"
                   placeholder="0,00"
                   className="w-full box-border bg-card border border-border rounded-sm py-[14px] pr-[14px] pl-11 font-heading font-semibold text-lg text-foreground outline-none"
@@ -180,9 +176,10 @@ export default function AddSubscription({ navigate }: Props) {
             </Field>
 
             {/* Next charge */}
-            <Field label="Próxima cobrança" error={errors.nextCharge?.message}>
+            <Field id="subscription-next-charge" label="Próxima cobrança" error={errors.nextCharge?.message}>
               <input
                 type="date"
+                id="subscription-next-charge"
                 className="w-full box-border bg-card border border-border rounded-sm p-[14px] font-body text-sm text-foreground outline-none [color-scheme:dark]"
                 {...register("nextCharge")}
               />
@@ -209,8 +206,9 @@ export default function AddSubscription({ navigate }: Props) {
             </Field>
 
             {/* Payment */}
-            <Field label="Forma de pagamento" error={errors.paymentMethod?.message}>
+            <Field id="subscription-payment-method" label="Forma de pagamento" error={errors.paymentMethod?.message}>
               <select
+                id="subscription-payment-method"
                 className="w-full bg-card border border-border rounded-sm p-[14px] font-body text-sm text-foreground outline-none [color-scheme:dark] appearance-none cursor-pointer"
                 {...register("paymentMethod")}
               >

@@ -62,7 +62,7 @@ A matriz analisa o escopo de permissão de cada perfil de acesso sobre os casos 
 | UC10: Consultar Tetos e Consumo Vigente | X | — | Barras de progresso com cálculo de estouro de meta |
 | UC11: Atualizar Teto Orçamentário | X | — | Ajuste rápido de limites orçamentários |
 | UC12: Excluir Teto Orçamentário | X | — | Remoção de limites prévios |
-| UC13: Fazer Upload de Extrato Bancário | X | — | Componente de upload e dropzone (.OFX e .CSV) |
+| UC13: Fazer Upload de Extrato Bancário | X | — | Componente de upload e dropzone (.CSV) |
 | UC14: Detectar e Conciliar Lançamentos | X | — | Lista com caixas de seleção (checkbox) em lote |
 | UC15: Consultar Histórico de Extratos | X | — | Auditoria de arquivos previamente processados |
 | UC16: Descartar Lançamento de Extrato | X | — | Descarte de despesas não recorrentes |

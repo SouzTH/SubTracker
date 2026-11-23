@@ -4,6 +4,7 @@ import { updateSub, deleteSub } from "../lib/api";
 import { subsQueryKey } from "../lib/queryClient";
 import { CANCEL_URLS } from "../constants/catalog";
 import { fmt, toMonthlyValue } from "../lib/money";
+import { getSubscriptionColorClasses } from "../lib/subscriptionColorClasses";
 
 interface Props {
   sub: Subscription;
@@ -69,10 +70,7 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Header with gradient */}
-      <div
-        className="pt-14 px-6 pb-6 border-b border-border"
-        style={{ background: `linear-gradient(160deg, ${sub.color}28 0%, transparent 60%)` }}
-      >
+      <div className={`pt-14 px-6 pb-6 border-b border-border ${getSubscriptionColorClasses(sub.color).detailHeader}`}>
         <div className="flex items-center gap-[14px] mb-6">
           <button
             onClick={() => navigate("dashboard")}
@@ -86,10 +84,7 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
         </div>
 
         <div className="flex items-center gap-[18px]">
-          <div
-            className="w-[72px] h-[72px] rounded-lg flex items-center justify-center text-4xl border-[1.5px]"
-            style={{ background: `${sub.color}22`, borderColor: `${sub.color}44` }}
-          >
+          <div className={`w-[72px] h-[72px] rounded-lg flex items-center justify-center text-4xl border-[1.5px] ${getSubscriptionColorClasses(sub.color).iconBackground} ${getSubscriptionColorClasses(sub.color).iconBorder}`}>
             {sub.icon}
           </div>
           <div>
@@ -122,10 +117,7 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
         </div>
 
         {/* Annual projection */}
-        <div
-          className="border rounded-md py-4 px-5 flex justify-between items-center mb-6"
-          style={{ background: `${sub.color}12`, borderColor: `${sub.color}30` }}
-        >
+        <div className={`border rounded-md py-4 px-5 flex justify-between items-center mb-6 ${getSubscriptionColorClasses(sub.color).projection}`}>
           <div>
             <p className="text-xs text-muted-foreground font-body mb-1">
               Projeção anual
@@ -134,10 +126,7 @@ export default function SubscriptionDetails({ sub, navigate }: Props) {
               {fmt(toMonthlyValue(sub) * 12)}
             </p>
           </div>
-          <div
-            className="w-11 h-11 rounded-[14px] flex items-center justify-center text-[22px]"
-            style={{ background: `${sub.color}22` }}
-          >
+          <div className={`w-11 h-11 rounded-[14px] flex items-center justify-center text-[22px] ${getSubscriptionColorClasses(sub.color).iconBackground}`}>
             📊
           </div>
         </div>

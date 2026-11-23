@@ -256,31 +256,34 @@ export default function ImportStatement({ navigate, subs }: Props) {
 
       <div className="px-6">
         {stage === "upload" && (
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragging(false);
-              const f = e.dataTransfer.files[0];
-              if (f) handleFile(f);
-            }}
-            onClick={() => fileRef.current?.click()}
-            className={`border-2 border-dashed rounded-lg py-12 px-6 flex flex-col items-center gap-3 cursor-pointer transition-colors duration-200 mb-5 ${
-              dragging ? "border-primary bg-primary/5" : "border-primary/25 bg-card"
-            }`}
-          >
-            <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center text-[32px]">
-              📄
-            </div>
-            <div className="text-center">
-              <p className="font-heading font-semibold text-base mb-1.5">
-                Arraste seu arquivo aqui
-              </p>
-              <p className="text-[13px] text-muted-foreground font-body">
-                ou clique para selecionar o arquivo .csv
-              </p>
-            </div>
+          <>
+            <button
+              type="button"
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const f = e.dataTransfer.files[0];
+                if (f) handleFile(f);
+              }}
+              onClick={() => fileRef.current?.click()}
+              className={`w-full text-center border-2 border-dashed rounded-lg py-12 px-6 flex flex-col items-center gap-3 cursor-pointer transition-colors duration-200 mb-5 ${
+                dragging ? "border-primary bg-primary/5" : "border-primary/25 bg-card"
+              }`}
+            >
+              <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center text-[32px]">
+                📄
+              </div>
+              <div className="text-center">
+                <p className="font-heading font-semibold text-base mb-1.5">
+                  Arraste seu arquivo aqui
+                </p>
+                <p className="text-[13px] text-muted-foreground font-body">
+                  ou clique para selecionar o arquivo .csv
+                </p>
+              </div>
+            </button>
             <input
               ref={fileRef}
               type="file"
@@ -291,7 +294,7 @@ export default function ImportStatement({ navigate, subs }: Props) {
                 if (f) handleFile(f);
               }}
             />
-          </div>
+          </>
         )}
 
         {stage === "review" && (

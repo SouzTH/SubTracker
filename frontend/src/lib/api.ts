@@ -16,10 +16,6 @@ export interface AuthResponse {
   user: CurrentUser;
 }
 
-interface RefreshResponse {
-  accessToken: string;
-}
-
 let refreshInProgress: Promise<string | null> | null = null;
 
 export function getStoredToken() {
@@ -66,7 +62,34 @@ async function renewAccessToken(): Promise<string | null> {
       return null;
     }
 
-    const payload = (await response.json()) as RefreshResponse;
+    if (response.status === 204) {
+      clearSession();
+      return null;
+    }
+
+    const text = await response.text();
+    if (!text.trim()) {
+      clearSession();
+      return null;
+    }
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new ApiError("Resposta inválida ao renovar a sessão.", response.status);
+    }
+
+    if (
+      typeof payload !== "object" ||
+      payload === null ||
+      !("accessToken" in payload) ||
+      typeof payload.accessToken !== "string"
+    ) {
+      clearSession();
+      return null;
+    }
+
     const user = getStoredUser();
     if (!payload.accessToken || !user) {
       clearSession();
@@ -190,17 +213,6 @@ export async function logoutUser() {
 
 export interface StoredUser extends CurrentUser {
   password?: string;
-}
-
-export function findUsersByEmail(email: string) {
-  return request<StoredUser[]>(`/users?email=${encodeURIComponent(email)}`);
-}
-
-export function createUser(data: { nome: string; email: string; password: string }) {
-  return request<StoredUser>(`/users`, {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
 }
 
 export function getCurrentUser() {
